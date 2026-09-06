@@ -226,3 +226,39 @@ def resize(image, out_h, out_w, method="bilinear", antialias=True, pad_mode="ref
     if method == "nearest":
         return resize_nearest(work, out_h, out_w)
     return resize_bilinear(work, out_h, out_w)
+
+
+# ---------------------------------------------------------------------------
+# Error measures
+# ---------------------------------------------------------------------------
+
+
+# Return the mean squared error between two equally shaped images.
+def mse(a, b):
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    return float(np.mean((a - b) ** 2))
+
+
+# Return the mean absolute error between two equally shaped images.
+def mae(a, b):
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    return float(np.mean(np.abs(a - b)))
+
+
+# Return the peak signal-to-noise ratio in dB, assuming a peak value of 1.0.
+def psnr(a, b, peak=1.0):
+    error = mse(a, b)
+    if error <= 1e-20:
+        return float("inf")
+    return float(10.0 * np.log10((peak ** 2) / error))
+
+
+# Return a contrast-stretched absolute difference map for visual comparison.
+def difference_map(a, b, gain=1.0):
+    diff = np.abs(np.asarray(a, dtype=np.float64) - np.asarray(b, dtype=np.float64))
+    if gain == "auto":
+        peak = diff.max()
+        gain = 1.0 if peak <= 1e-12 else 1.0 / peak
+    return np.clip(diff * float(gain), 0.0, 1.0)
