@@ -1,0 +1,17 @@
+# Django
+.secret_key
+staticfiles/
+
+# User uploads and generated result panels are runtime artefacts
+media/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
