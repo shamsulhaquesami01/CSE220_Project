@@ -1,0 +1,213 @@
+{% extends "image_lab/base.html" %}
+{% load static %}
+
+{% block content %}
+<form id="csrf-holder">{% csrf_token %}</form>
+
+<div class="layout">
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Control column                                                      -->
+  <!-- ------------------------------------------------------------------ -->
+  <aside class="controls">
+
+    <section class="card">
+      <h2>1 &middot; Source image</h2>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="image/png,image/jpeg,image/bmp,image/webp,image/tiff" hidden>
+        <span class="dropzone-icon">&#8682;</span>
+        <span class="dropzone-text">Drop an image here or <u>browse</u></span>
+        <span class="dropzone-hint">PNG / JPEG / BMP / WebP / TIFF &middot; up to {{ max_upload_mb }} MB</span>
+      </label>
+
+      <label class="checkline">
+        <input type="checkbox" id="opt-grayscale">
+        <span>Convert to grayscale on upload</span>
+      </label>
+
+      <p class="fineprint">
+        Uploads are downscaled so the longest edge is {{ max_dim }} px, keeping the live
+        preview responsive. That ingest resize is itself anti-aliased.
+      </p>
+      <p class="status" id="upload-status">No image loaded.</p>
+    </section>
+
+    <section class="card" id="op-card" hidden>
+      <h2>2 &middot; Operation</h2>
+      <div class="tabs" role="tablist">
+        {% for op in operations %}
+          <button type="button" class="tab{% if forloop.first %} is-active{% endif %}"
+                  role="tab" data-op="{{ op.op_id }}">{{ op.label }}</button>
+        {% endfor %}
+      </div>
+      {% for op in operations %}
+        <p class="op-description" data-op-desc="{{ op.op_id }}"
+           {% if not forloop.first %}hidden{% endif %}>{{ op.description }}</p>
+      {% endfor %}
+    </section>
+
+    <!-- Convolution panel ------------------------------------------------->
+    <section class="card op-panel" data-op-panel="convolve" hidden>
+      <h2>3 &middot; Kernel</h2>
+
+      <div class="field">
+        <label for="kernel-preset">Preset</label>
+        <select id="kernel-preset">
+          <option value="">Custom&hellip;</option>
+          {% for name in preset_names %}
+            <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="kernel-size">Kernel size</label>
+        <select id="kernel-size">
+          <option value="3" selected>3 &times; 3</option>
+          <option value="5">5 &times; 5</option>
+          <option value="7">7 &times; 7</option>
+        </select>
+      </div>
+
+      <div class="kernel-grid" id="kernel-grid"></div>
+
+      <div class="kernel-readout">
+        <span>Sum</span><strong id="kernel-sum">1.0000</strong>
+      </div>
+
+      <div class="row">
+        <button type="button" class="ghost" id="kernel-normalize-now">Normalise</button>
+        <button type="button" class="ghost" id="kernel-clear">Clear</button>
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="conv-normalize">
+        <span>Auto-normalise before applying</span>
+      </label>
+
+      <div class="field">
+        <label for="conv-pad">Border handling</label>
+        <select id="conv-pad" class="pad-select">
+          {% for mode in pad_modes %}<option value="{{ mode }}">{{ mode }}</option>{% endfor %}
+        </select>
+      </div>
+    </section>
+
+    <!-- Resample panel ---------------------------------------------------->
+    <section class="card op-panel" data-op-panel="resample" hidden>
+      <h2>3 &middot; Resampling</h2>
+
+      <div class="field">
+        <label for="resize-scale">Scale factor <output id="resize-scale-out">0.25&times;</output></label>
+        <input type="range" id="resize-scale" min="0.05" max="2" step="0.01" value="0.25">
+      </div>
+
+      <div class="field">
+        <label for="resize-method">Interpolation</label>
+        <select id="resize-method">
+          <option value="bilinear" selected>Bilinear (linear)</option>
+          <option value="nearest">Nearest neighbour</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="resize-pad">Border handling</label>
+        <select id="resize-pad" class="pad-select">
+          {% for mode in pad_modes %}<option value="{{ mode }}">{{ mode }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <p class="fineprint">
+        Both results are magnified back to the original size with nearest neighbour so you
+        compare the <em>same</em> sample set at a size where moir&eacute; is visible.
+      </p>
+    </section>
+
+    <!-- Noise panel ------------------------------------------------------->
+    <section class="card op-panel" data-op-panel="noise" hidden>
+      <h2>3 &middot; Noise &amp; cleaning</h2>
+
+      <div class="field">
+        <label for="noise-model">Noise model</label>
+        <select id="noise-model">
+          {% for key, label in noise_models.items %}
+            <option value="{{ key }}"{% if key == 'salt_pepper' %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field" data-noise-param="gaussian" hidden>
+        <label for="noise-sigma">Noise &sigma; <output id="noise-sigma-out">0.08</output></label>
+        <input type="range" id="noise-sigma" min="0" max="0.5" step="0.005" value="0.08">
+      </div>
+
+      <div class="field" data-noise-param="salt_pepper">
+        <label for="noise-amount">Corrupted fraction <output id="noise-amount-out">6%</output></label>
+        <input type="range" id="noise-amount" min="0" max="0.5" step="0.005" value="0.06">
+      </div>
+
+      <div class="field">
+        <label for="clean-filter">Cleaning filter</label>
+        <select id="clean-filter">
+          {% for key, label in clean_filters.items %}
+            <option value="{{ key }}"{% if key == 'median' %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="field" data-filter-param="window">
+        <label for="filter-size">Window size <output id="filter-size-out">3</output></label>
+        <input type="range" id="filter-size" min="1" max="11" step="2" value="3">
+      </div>
+
+      <div class="field" data-filter-param="sigma" hidden>
+        <label for="filter-sigma">Filter &sigma; <output id="filter-sigma-out">1.0</output></label>
+        <input type="range" id="filter-sigma" min="0.2" max="5" step="0.1" value="1">
+      </div>
+
+      <div class="field">
+        <label for="noise-seed">Random seed</label>
+        <input type="number" id="noise-seed" min="0" max="999999" value="0">
+      </div>
+
+      <div class="field">
+        <label for="noise-pad">Border handling</label>
+        <select id="noise-pad" class="pad-select">
+          {% for mode in pad_modes %}<option value="{{ mode }}">{{ mode }}</option>{% endfor %}
+        </select>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Results column                                                      -->
+  <!-- ------------------------------------------------------------------ -->
+  <section class="results">
+    <div class="empty-state" id="empty-state">
+      <h2>Load an image to begin</h2>
+      <p>
+        Every filter here is computed from the convolution sum and the interpolation
+        equations directly &mdash; no OpenCV, no <code>scipy.ndimage</code>.
+      </p>
+    </div>
+
+    <div class="alert" id="error-box" hidden></div>
+
+    <div class="panel-grid" id="panel-grid"></div>
+
+    <div class="notes" id="notes-box" hidden></div>
+
+    <div class="metrics" id="metrics-box" hidden>
+      <h3>Measurements</h3>
+      <table id="metrics-table"><tbody></tbody></table>
+    </div>
+
+    <div class="spinner" id="spinner" hidden><span></span> computing&hellip;</div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
+<script src="{% static 'image_lab/js/app.js' %}"></script>
+{% endblock %}

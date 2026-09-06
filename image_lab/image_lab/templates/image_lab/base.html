@@ -1,0 +1,30 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Image Lab{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'image_lab/css/style.css' %}">
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div>
+        <h1>Image&nbsp;Lab</h1>
+        <p class="subtitle">2D convolution, resampling and restoration &mdash; CSE&nbsp;220 Signals &amp; Linear Systems</p>
+      </div>
+      <div class="badge">NumPy&nbsp;core</div>
+    </div>
+  </header>
+
+  <main class="shell">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>All filtering implemented from first principles in <code>image_lab/dsp_utils.py</code>.</p>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
