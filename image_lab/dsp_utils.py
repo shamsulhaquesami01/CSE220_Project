@@ -65,7 +65,6 @@ def _convolve2d_plane(plane, kernel, pad_mode="reflect"):
         padded = np.pad(plane, ((top, bottom), (left, right)), mode=np_mode)
         
     # sliding_window_view is a stride trick: it produces an (H, W, kh, kw) view
-    # of every kh-by-kw neighbourhood without copying the underlying data.
     windows = sliding_window_view(padded, (kh, kw))
     
     # Contract each window against the flipped kernel -> one output sample.
@@ -150,15 +149,6 @@ def unsharp_mask(image, sigma=1.0, amount=1.0, pad_mode="reflect"):
 # ---------------------------------------------------------------------------
 # Resampling: nearest neighbour, bilinear, and anti-aliased downsampling
 # ---------------------------------------------------------------------------
-
-# All resampling here uses the *half-pixel centre* convention. Pixel k of an
-# N-wide row is treated as covering [k, k+1) with its centre at k + 0.5. To find
-# where output pixel `d` lands in the input we match normalised centres:
-#     (d + 0.5) / out = (s + 0.5) / in
-#     s = (d + 0.5) * (in / out) - 0.5
-# This is the convention that keeps an image geometrically centred after a
-# resize. The naive alternative, s = d * (in / out), shifts the picture by half
-# a pixel and is a classic source of "my resized image drifted" bugs.
 
 # Return the source coordinates that each output sample reads from.
 def _sample_coords(in_size, out_size):
