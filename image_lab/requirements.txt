@@ -1,0 +1,10 @@
+# Image Lab -- CSE 220
+#
+# The DSP core (image_lab/dsp_utils.py) needs NumPy and nothing else.
+# Pillow is used only to decode and encode image files.
+# SciPy is deliberately NOT a dependency: the convolution, interpolation and
+# anti-aliasing are implemented from their definitions rather than called.
+
+Django>=5.0,<7.0
+numpy>=1.24
+Pillow>=10.0
