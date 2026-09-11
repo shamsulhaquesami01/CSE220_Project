@@ -17,6 +17,16 @@ python -m pip install -r requirements.txt
 python manage.py runserver
 ```
 
+
+## mac 
+
+cd CSE220_Project/image_lab
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 manage.py runserver
+
+
 Open <http://127.0.0.1:8000/>. There is no database and no migration step.
 
 ```bash
