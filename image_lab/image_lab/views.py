@@ -108,17 +108,28 @@ def process(request):
         logger.exception("Operation %s failed", op_id)
         return JsonResponse({"error": "The operation failed. Check the server log."}, status=500)
 
-    panels = [
-        {
+    panels = []
+    for panel in result.panels:
+        preview_url = imaging.save_panel(panel.image, image_id, op_id, params, panel.key)
+        download_image = panel.download_image
+        if download_image is None:
+            download_image = panel.image
+            download_url = preview_url
+        else:
+            download_url = imaging.save_panel(
+                download_image, image_id, op_id, params, f"{panel.key}_download"
+            )
+        panels.append({
             "key": panel.key,
             "label": panel.label,
             "caption": panel.caption,
-            "url": imaging.save_panel(panel.image, image_id, op_id, params, panel.key),
+            "url": preview_url,
+            "download_url": download_url,
+            "download_width": int(download_image.shape[1]),
+            "download_height": int(download_image.shape[0]),
             "width": int(panel.image.shape[1]),
             "height": int(panel.image.shape[0]),
-        }
-        for panel in result.panels
-    ]
+        })
 
     return JsonResponse(
         {

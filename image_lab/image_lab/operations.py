@@ -38,6 +38,7 @@ class Panel:
     label: str
     image: np.ndarray
     caption: str = ""
+    download_image: np.ndarray | None = None
 
 
 @dataclass
@@ -276,13 +277,17 @@ def op_resample(image: np.ndarray, params: dict) -> OpResult:
             "no_aa",
             "Without anti-aliasing",
             view_no_aa,
-            f"Decimated straight to {out_w} &times; {out_h}",
+            f"Resized to {out_w} &times; {out_h}; preview at source size",
+            download_image=without_aa,
         ),
         Panel(
             "aa",
             "With anti-aliasing",
             view_aa,
-            f"Gaussian prefilter, then {out_w} &times; {out_h}",
+            f"Resized to {out_w} &times; {out_h}; "
+            + ("Gaussian prefilter applied" if scale < 1.0 else "No prefilter needed")
+            + "; preview at source size",
+            download_image=with_aa,
         ),
         Panel("difference", "Difference", difference, "Alias energy, auto-scaled"),
     ]

@@ -238,11 +238,12 @@
       const actions = document.createElement('div');
       actions.className = 'panel-actions';
       const dims = document.createElement('span');
-      dims.textContent = `${panel.width} × ${panel.height}`;
+      dims.textContent = `${panel.download_width ?? panel.width} × ${panel.download_height ?? panel.height}`;
+      dims.title = 'Downloaded image dimensions';
 
       const download = document.createElement('a');
       download.className = 'panel-download';
-      download.href = panel.url;
+      download.href = panel.download_url || panel.url;
       download.download = `image-lab-${data.op}-${panel.key}.png`;
       download.textContent = 'Download PNG';
       download.setAttribute('aria-label', `Download ${panel.label} as PNG`);
