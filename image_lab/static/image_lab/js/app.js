@@ -234,9 +234,21 @@
       head.className = 'panel-head';
       const title = document.createElement('strong');
       title.textContent = panel.label;
+
+      const actions = document.createElement('div');
+      actions.className = 'panel-actions';
       const dims = document.createElement('span');
       dims.textContent = `${panel.width} × ${panel.height}`;
-      head.append(title, dims);
+
+      const download = document.createElement('a');
+      download.className = 'panel-download';
+      download.href = panel.url;
+      download.download = `image-lab-${data.op}-${panel.key}.png`;
+      download.textContent = 'Download PNG';
+      download.setAttribute('aria-label', `Download ${panel.label} as PNG`);
+
+      actions.append(dims, download);
+      head.append(title, actions);
 
       const figure = document.createElement('figure');
       const img = document.createElement('img');

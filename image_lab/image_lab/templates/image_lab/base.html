@@ -9,20 +9,31 @@
 <body>
   <header class="masthead">
     <div class="masthead-inner">
-      <div>
-        <h1>Image&nbsp;Lab</h1>
-        <p class="subtitle">2D convolution, resampling and restoration &mdash; CSE&nbsp;220 Signals &amp; Linear Systems</p>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div class="brand-name">Image Lab<span>THE VISUAL SIGNAL STUDIO</span></div>
       </div>
-      <div class="badge">NumPy&nbsp;core</div>
+      <div class="badge"><span aria-hidden="true"></span>CSE 220 <b>/</b> Signals &amp; systems</div>
     </div>
   </header>
 
   <main class="shell">
+    <section class="intro" aria-labelledby="studio-title">
+      <div>
+        <p class="eyebrow">A PLAYGROUND FOR PIXELS</p>
+        <h1 id="studio-title">Small changes.<br>New <em>perspectives.</em></h1>
+      </div>
+      <div class="intro-detail">
+        <p>Explore the signals behind your images.<br>Shape a kernel. Shift the scale. See what changes.</p>
+        <span class="intro-tag">01 / CONVOLUTION</span><span class="intro-tag">02 / RESAMPLING</span>
+      </div>
+    </section>
     {% block content %}{% endblock %}
   </main>
 
   <footer class="footer">
-    <p>All filtering implemented from first principles in <code>image_lab/dsp_utils.py</code>.</p>
+    <p>Image Lab <span>/</span> Signals made visible.</p>
+    <p>CSE 220 <span>&middot;</span> Built from first principles</p>
   </footer>
 
   {% block scripts %}{% endblock %}
