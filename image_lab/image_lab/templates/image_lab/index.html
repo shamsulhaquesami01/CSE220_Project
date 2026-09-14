@@ -178,6 +178,47 @@
         </select>
       </div>
     </section>
+
+    <!-- Frequency-domain restoration panel ------------------------------->
+    <section class="card op-panel" data-op-panel="deblur" hidden>
+      <h2><span class="step">03</span> Rebuild what motion erased</h2>
+
+      <div class="field">
+        <label for="deblur-length">Motion length <output id="deblur-length-out">17 px</output></label>
+        <input type="range" id="deblur-length" min="1" max="61" step="1" value="17">
+      </div>
+
+      <div class="field">
+        <label for="deblur-angle">Motion angle <output id="deblur-angle-out">18&deg;</output></label>
+        <input type="range" id="deblur-angle" min="-90" max="90" step="1" value="18">
+      </div>
+
+      <div class="field">
+        <label for="deblur-noise">Sensor noise &sigma; <output id="deblur-noise-out">0.012</output></label>
+        <input type="range" id="deblur-noise" min="0" max="0.08" step="0.001" value="0.012">
+      </div>
+
+      <div class="field">
+        <label for="deblur-wiener">Wiener strength K <output id="deblur-wiener-out">1.0e-3</output></label>
+        <input type="range" id="deblur-wiener" min="-7" max="-0.5" step="0.1" value="-3">
+      </div>
+
+      <div class="field">
+        <label for="deblur-floor">Inverse cutoff <output id="deblur-floor-out">1.0e-3</output></label>
+        <input type="range" id="deblur-floor" min="-7" max="-1" step="0.25" value="-3">
+      </div>
+
+      <div class="field">
+        <label for="deblur-seed">Noise seed</label>
+        <input type="number" id="deblur-seed" min="0" max="999999" value="0">
+      </div>
+
+      <p class="fineprint">
+        This experiment works in the Fourier domain: G = H&middot;F + N. Direct inverse
+        filtering divides by H; Wiener restoration regularises frequencies where the blur
+        transfer function is almost zero.
+      </p>
+    </section>
   </aside>
 
   <!-- ------------------------------------------------------------------ -->
@@ -211,5 +252,5 @@
 
 {% block scripts %}
 <script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
-<script src="{% static 'image_lab/js/app.js' %}?v=resample-downloads-2"></script>
+<script src="{% static 'image_lab/js/app.js' %}?v=fft-deblur-1"></script>
 {% endblock %}
