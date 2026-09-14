@@ -354,3 +354,158 @@ def difference_map(a, b, gain=1.0):
         peak = diff.max()
         gain = 1.0 if peak <= 1e-12 else 1.0 / peak
     return np.clip(diff * float(gain), 0.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Frequency-domain motion blur and restoration
+# ---------------------------------------------------------------------------
+
+
+def motion_psf(length=17, angle=0.0):
+    """Return a normalised motion-blur point-spread function.
+
+    The ideal line is sampled densely and splatted bilinearly onto the pixel
+    grid.  That keeps diagonal kernels smooth instead of producing a jagged
+    nearest-pixel staircase.
+    """
+    length = max(1.0, float(length))
+    if length <= 1.0:
+        return np.array([[1.0]], dtype=np.float64)
+
+    radius = int(np.ceil(length / 2.0)) + 1
+    size = 2 * radius + 1
+    centre = radius
+    psf = np.zeros((size, size), dtype=np.float64)
+
+    theta = np.deg2rad(float(angle))
+    half = (length - 1.0) / 2.0
+    samples = max(32, int(np.ceil(length * 16.0)))
+    t = np.linspace(-half, half, samples)
+    xs = centre + t * np.cos(theta)
+    ys = centre + t * np.sin(theta)
+
+    for x, y in zip(xs, ys):
+        x0, y0 = int(np.floor(x)), int(np.floor(y))
+        dx, dy = x - x0, y - y0
+        for oy, wy in ((0, 1.0 - dy), (1, dy)):
+            for ox, wx in ((0, 1.0 - dx), (1, dx)):
+                yy, xx = y0 + oy, x0 + ox
+                if 0 <= yy < size and 0 <= xx < size:
+                    psf[yy, xx] += wx * wy
+
+    total = psf.sum()
+    if total <= 0:
+        psf[centre, centre] = 1.0
+        return psf
+    return psf / total
+
+
+def psf_to_otf(psf, shape):
+    """Convert a centred spatial PSF into its optical transfer function H(u,v)."""
+    psf = np.asarray(psf, dtype=np.float64)
+    if psf.ndim != 2:
+        raise ValueError("PSF must be a 2D array")
+    height, width = int(shape[0]), int(shape[1])
+    kh, kw = psf.shape
+    if kh > height or kw > width:
+        raise ValueError("PSF is larger than the transform grid")
+
+    padded = np.zeros((height, width), dtype=np.float64)
+    padded[:kh, :kw] = psf
+    padded = np.roll(padded, -(kh // 2), axis=0)
+    padded = np.roll(padded, -(kw // 2), axis=1)
+    return np.fft.fft2(padded)
+
+
+def transfer_magnitude_image(psf, shape):
+    """Return a displayable, centred log-magnitude image of |H(u,v)|."""
+    h = psf_to_otf(psf, shape)
+    magnitude = np.abs(np.fft.fftshift(h))
+    view = np.log1p(100.0 * magnitude)
+    peak = view.max()
+    return view / peak if peak > 0 else view
+
+
+def _frequency_restore_plane(
+    plane,
+    psf,
+    noise_sigma,
+    wiener_k,
+    inverse_floor,
+    rng,
+):
+    margin = max(psf.shape)
+    padded = np.pad(
+        np.asarray(plane, dtype=np.float64),
+        ((margin, margin), (margin, margin)),
+        mode="reflect",
+    )
+
+    h = psf_to_otf(psf, padded.shape)
+    f = np.fft.fft2(padded)
+    blurred_pad = np.real(np.fft.ifft2(f * h))
+
+    if noise_sigma > 0.0:
+        degraded_pad = blurred_pad + rng.normal(0.0, noise_sigma, blurred_pad.shape)
+    else:
+        degraded_pad = blurred_pad.copy()
+
+    g = np.fft.fft2(degraded_pad)
+    abs_h = np.abs(h)
+
+    # Direct inverse filtering: Fhat = G/H.  We only suppress bins where H is
+    # essentially zero to avoid literal infinities; near-zeros are deliberately
+    # left in so the classic noise-amplification failure remains visible.
+    inverse_spectrum = np.zeros_like(g)
+    stable = abs_h >= inverse_floor
+    inverse_spectrum[stable] = g[stable] / h[stable]
+    inverse_pad = np.real(np.fft.ifft2(inverse_spectrum))
+
+    # Wiener/Tikhonov form: conjugate(H)/( |H|^2 + K ).  K trades perfect
+    # inversion for stability in bins the blur has almost erased.
+    wiener_spectrum = g * np.conj(h) / (abs_h ** 2 + wiener_k)
+    wiener_pad = np.real(np.fft.ifft2(wiener_spectrum))
+
+    crop = (slice(margin, -margin), slice(margin, -margin))
+    return (
+        np.clip(blurred_pad[crop], 0.0, 1.0),
+        np.clip(degraded_pad[crop], 0.0, 1.0),
+        np.clip(inverse_pad[crop], 0.0, 1.0),
+        np.clip(wiener_pad[crop], 0.0, 1.0),
+    )
+
+
+def motion_deblur_experiment(
+    image,
+    length=17,
+    angle=0.0,
+    noise_sigma=0.01,
+    wiener_k=1e-3,
+    inverse_floor=1e-3,
+    seed=0,
+):
+    """Blur an image with a known PSF, add noise, then restore it two ways.
+
+    Returns (blurred, degraded, inverse, wiener, psf).  Reflect padding is used
+    before the FFT so circular wrap-around is pushed outside the visible crop.
+    """
+    image = np.asarray(image, dtype=np.float64)
+    psf = motion_psf(length, angle)
+    rng = np.random.default_rng(seed)
+
+    if image.ndim == 2:
+        blurred, degraded, inverse, wiener = _frequency_restore_plane(
+            image, psf, noise_sigma, wiener_k, inverse_floor, rng
+        )
+        return blurred, degraded, inverse, wiener, psf
+
+    outputs = [[], [], [], []]
+    for c in range(image.shape[-1]):
+        channel_results = _frequency_restore_plane(
+            image[..., c], psf, noise_sigma, wiener_k, inverse_floor, rng
+        )
+        for bucket, channel in zip(outputs, channel_results):
+            bucket.append(channel)
+
+    stacked = [np.stack(channels, axis=-1) for channels in outputs]
+    return (*stacked, psf)
