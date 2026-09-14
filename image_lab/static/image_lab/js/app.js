@@ -20,23 +20,17 @@
   const state = {
     imageId: null,
     op: 'convolve',
-    kernel: null,       // 2D array of numbers
-    inFlight: null,     // AbortController for the current request
+    kernel: null,
+    inFlight: null,
     timer: null,
   };
 
-  // ---------------------------------------------------------------------
-  // Kernel editor
-  // ---------------------------------------------------------------------
-
-  // Build an n-by-n identity kernel (centre 1, everything else 0).
   function identityKernel(n) {
     const k = Array.from({ length: n }, () => new Array(n).fill(0));
     k[(n - 1) >> 1][(n - 1) >> 1] = 1;
     return k;
   }
 
-  // Rebuild the input grid from state.kernel.
   function renderKernel() {
     const grid = $('#kernel-grid');
     const n = state.kernel.length;
@@ -60,7 +54,6 @@
           const parsed = parseFloat(input.value);
           state.kernel[y][x] = Number.isFinite(parsed) ? parsed : 0;
           updateKernelSum();
-          // Editing a cell means it is no longer one of the named presets.
           $('#kernel-preset').value = '';
           scheduleRun();
         });
@@ -71,7 +64,6 @@
     updateKernelSum();
   }
 
-  // Trim float noise so 1/9 shows as 0.1111 rather than 0.11111111111111.
   function formatCell(value) {
     if (Number.isInteger(value)) return String(value);
     return String(Math.round(value * 10000) / 10000);
@@ -82,13 +74,10 @@
     $('#kernel-sum').textContent = total.toFixed(4);
   }
 
-  // Resize the kernel grid, keeping any overlapping coefficients.
   function resizeKernel(n) {
     const next = identityKernel(n);
     const old = state.kernel;
     if (old) {
-      // Align the two grids on their centres so a 3x3 blur stays centred
-      // when promoted to 5x5, instead of drifting into the corner.
       const offset = ((n - old.length) / 2) | 0;
       for (let y = 0; y < old.length; y++) {
         for (let x = 0; x < old[y].length; x++) {
@@ -101,10 +90,6 @@
     state.kernel = next;
     renderKernel();
   }
-
-  // ---------------------------------------------------------------------
-  // Parameter collection
-  // ---------------------------------------------------------------------
 
   function currentParams() {
     if (state.op === 'convolve') {
@@ -133,12 +118,18 @@
         pad_mode: $('#noise-pad').value,
       };
     }
+    if (state.op === 'deblur') {
+      return {
+        motion_length: parseFloat($('#deblur-length').value),
+        motion_angle: parseFloat($('#deblur-angle').value),
+        noise_sigma: parseFloat($('#deblur-noise').value),
+        wiener_log10: parseFloat($('#deblur-wiener').value),
+        inverse_floor_log10: parseFloat($('#deblur-floor').value),
+        seed: parseInt($('#deblur-seed').value, 10) || 0,
+      };
+    }
     return {};
   }
-
-  // ---------------------------------------------------------------------
-  // Networking
-  // ---------------------------------------------------------------------
 
   function scheduleRun(delay = 180) {
     clearTimeout(state.timer);
@@ -148,7 +139,6 @@
   async function run() {
     if (!state.imageId) return;
 
-    // Cancel whatever is still in the air; only the newest result matters.
     if (state.inFlight) state.inFlight.abort();
     const controller = new AbortController();
     state.inFlight = controller;
@@ -218,10 +208,6 @@
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------
-
   function renderResults(data) {
     const grid = $('#panel-grid');
     grid.replaceChildren();
@@ -260,7 +246,6 @@
 
       if (panel.caption) {
         const caption = document.createElement('figcaption');
-        // Captions are server-generated and may carry entities like &times;.
         caption.innerHTML = panel.caption;
         figure.appendChild(caption);
       }
@@ -315,7 +300,6 @@
     });
   }
 
-  // Show only the parameters that apply to the selected noise model / filter.
   function syncNoiseVisibility() {
     const model = $('#noise-model').value;
     $$('[data-noise-param]').forEach((el) => {
@@ -326,15 +310,14 @@
     $('[data-filter-param="sigma"]').hidden = filter !== 'gaussian';
   }
 
-  // ---------------------------------------------------------------------
-  // Wiring
-  // ---------------------------------------------------------------------
+  function scientificFromLog(value) {
+    return (10 ** parseFloat(value)).toExponential(1);
+  }
 
   function init() {
     state.kernel = identityKernel(3);
     renderKernel();
 
-    // --- upload ---
     const dropzone = $('#dropzone');
     const fileInput = $('#file-input');
 
@@ -360,11 +343,9 @@
     });
 
     $('#opt-grayscale').addEventListener('change', () => {
-      // Colour mode is decided at ingest, so re-send the same file.
       if (fileInput.files[0]) uploadFile(fileInput.files[0]);
     });
 
-    // --- operation tabs ---
     $$('.tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         $$('.tab').forEach((t) => t.classList.remove('is-active'));
@@ -375,7 +356,6 @@
       });
     });
 
-    // --- kernel controls ---
     $('#kernel-preset').addEventListener('change', (e) => {
       const preset = PRESETS[e.target.value];
       if (!preset) return;
@@ -393,7 +373,7 @@
 
     $('#kernel-normalize-now').addEventListener('click', () => {
       const total = state.kernel.flat().reduce((a, b) => a + b, 0);
-      if (Math.abs(total) < 1e-12) return;   // zero-sum kernels must not be scaled
+      if (Math.abs(total) < 1e-12) return;
       state.kernel = state.kernel.map((row) => row.map((v) => v / total));
       renderKernel();
       scheduleRun(0);
@@ -408,7 +388,6 @@
     $('#conv-normalize').addEventListener('change', () => scheduleRun(0));
     $('#conv-pad').addEventListener('change', () => scheduleRun(0));
 
-    // --- resample controls ---
     $('#resize-scale').addEventListener('input', (e) => {
       $('#resize-scale-out').textContent = `${parseFloat(e.target.value).toFixed(2)}×`;
       scheduleRun();
@@ -416,7 +395,6 @@
     $('#resize-method').addEventListener('change', () => scheduleRun(0));
     $('#resize-pad').addEventListener('change', () => scheduleRun(0));
 
-    // --- noise controls ---
     $('#noise-model').addEventListener('change', () => { syncNoiseVisibility(); scheduleRun(0); });
     $('#clean-filter').addEventListener('change', () => { syncNoiseVisibility(); scheduleRun(0); });
 
@@ -438,6 +416,28 @@
     });
     $('#noise-seed').addEventListener('change', () => scheduleRun(0));
     $('#noise-pad').addEventListener('change', () => scheduleRun(0));
+
+    $('#deblur-length').addEventListener('input', (e) => {
+      $('#deblur-length-out').textContent = `${parseFloat(e.target.value).toFixed(0)} px`;
+      scheduleRun();
+    });
+    $('#deblur-angle').addEventListener('input', (e) => {
+      $('#deblur-angle-out').innerHTML = `${parseFloat(e.target.value).toFixed(0)}&deg;`;
+      scheduleRun();
+    });
+    $('#deblur-noise').addEventListener('input', (e) => {
+      $('#deblur-noise-out').textContent = parseFloat(e.target.value).toFixed(3);
+      scheduleRun();
+    });
+    $('#deblur-wiener').addEventListener('input', (e) => {
+      $('#deblur-wiener-out').textContent = scientificFromLog(e.target.value);
+      scheduleRun();
+    });
+    $('#deblur-floor').addEventListener('input', (e) => {
+      $('#deblur-floor-out').textContent = scientificFromLog(e.target.value);
+      scheduleRun();
+    });
+    $('#deblur-seed').addEventListener('change', () => scheduleRun(0));
 
     syncNoiseVisibility();
   }
