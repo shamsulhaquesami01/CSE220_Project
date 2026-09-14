@@ -339,6 +339,10 @@ def op_resample(image: np.ndarray, params: dict) -> OpResult:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Operation 3 -- noise injection and cleaning
+# ---------------------------------------------------------------------------
+
 NOISE_MODELS = {
     "none": "No noise",
     "gaussian": "Additive white Gaussian",
@@ -351,6 +355,101 @@ CLEAN_FILTERS = {
     "median": "Median",
     "gaussian": "Gaussian low-pass",
 }
+
+
+@register(
+    "noise",
+    "Noise & Cleaning",
+    "Corrupt the image with a known noise model, then compare restoration filters.",
+)
+def op_noise(image: np.ndarray, params: dict) -> OpResult:
+    noise_model = _as_choice(params, "noise_model", set(NOISE_MODELS), "salt_pepper")
+    clean_filter = _as_choice(params, "clean_filter", set(CLEAN_FILTERS), "median")
+    pad_mode = _as_choice(params, "pad_mode", set(dsp.PAD_MODES), "reflect")
+
+    noise_sigma = _as_float(params, "noise_sigma", 0.08, 0.0, 1.0)
+    noise_amount = _as_float(params, "noise_amount", 0.06, 0.0, 1.0)
+    filter_size = _as_int(params, "filter_size", 3, 1, 15)
+    filter_sigma = _as_float(params, "filter_sigma", 1.0, 0.1, 10.0)
+    # A fixed seed keeps the noise stable while you tune the filter, so any
+    # change you see is the filter's doing and not a fresh random draw.
+    seed = _as_int(params, "seed", 0, 0, 10_000_000)
+
+    # Force odd window sizes: an even window has no centre sample to replace.
+    if filter_size % 2 == 0:
+        filter_size += 1
+
+    if noise_model == "gaussian":
+        noisy = dsp.add_gaussian_noise(image, noise_sigma, seed=seed)
+    elif noise_model == "salt_pepper":
+        noisy = dsp.add_salt_pepper(image, noise_amount, seed=seed)
+    else:
+        noisy = image.copy()
+
+    started = time.perf_counter()
+    if clean_filter == "mean":
+        cleaned = dsp.mean_filter2d(noisy, filter_size, pad_mode)
+    elif clean_filter == "median":
+        cleaned = dsp.median_filter2d(noisy, filter_size, pad_mode)
+    elif clean_filter == "gaussian":
+        cleaned = dsp.gaussian_blur(noisy, filter_sigma, pad_mode)
+    else:
+        cleaned = noisy.copy()
+    elapsed_ms = (time.perf_counter() - started) * 1000.0
+
+    cleaned = np.clip(cleaned, 0.0, 1.0)
+
+    psnr_noisy = dsp.psnr(image, noisy)
+    psnr_clean = dsp.psnr(image, cleaned)
+    gain_db = psnr_clean - psnr_noisy
+
+    result = OpResult()
+    result.panels = [
+        Panel("original", "Original", image, "Clean reference"),
+        Panel("noisy", "Noisy", noisy, NOISE_MODELS[noise_model]),
+        Panel("cleaned", "Cleaned", cleaned, CLEAN_FILTERS[clean_filter]),
+        Panel(
+            "residual",
+            "Residual",
+            dsp.difference_map(image, cleaned, gain="auto"),
+            "|original - cleaned|, auto-scaled",
+        ),
+    ]
+
+    result.metrics = [
+        Metric("Noise model", NOISE_MODELS[noise_model]),
+        Metric("Cleaning filter", CLEAN_FILTERS[clean_filter]),
+        Metric("MSE noisy", _fmt(dsp.mse(image, noisy), 6)),
+        Metric("MSE cleaned", _fmt(dsp.mse(image, cleaned), 6)),
+        Metric("PSNR noisy", f"{_fmt(psnr_noisy, 2)} dB"),
+        Metric("PSNR cleaned", f"{_fmt(psnr_clean, 2)} dB"),
+        Metric(
+            "PSNR gain",
+            f"{gain_db:+.2f} dB",
+            "Positive means the filter recovered more than it destroyed.",
+        ),
+        Metric("SSIM noisy", _fmt(dsp.ssim(image, noisy), 4)),
+        Metric("SSIM cleaned", _fmt(dsp.ssim(image, cleaned), 4)),
+        Metric("Compute time", f"{elapsed_ms:.1f} ms"),
+    ]
+
+    if noise_model == "salt_pepper" and clean_filter == "mean":
+        result.notes.append(
+            "A moving average is the wrong tool for impulse noise: it cannot discard an "
+            "outlier, it only spreads each spike over the whole window. Switch to the "
+            "median to see an order-statistic filter reject the impulses outright."
+        )
+    if noise_model == "gaussian" and clean_filter == "median":
+        result.notes.append(
+            "The median does work on Gaussian noise, but a linear filter is a better match "
+            "here: Gaussian noise is not made of outliers, so averaging is close to optimal."
+        )
+    if gain_db < 0:
+        result.notes.append(
+            "PSNR went down. The filter is blurring away more real signal than it is "
+            "removing noise -- try a smaller window."
+        )
+    return result
 
 
 # Return the registered operation, raising KeyError if the id is unknown.
