@@ -14,6 +14,8 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  const inspectImage = window.createImageInspector();
+
   const PRESETS = JSON.parse($('#kernel-presets').textContent);
   const CSRF = $('#csrf-holder input[name="csrfmiddlewaretoken"]').value;
 
@@ -242,7 +244,18 @@
       img.src = panel.url;
       img.alt = panel.label;
       img.loading = 'lazy';
-      figure.appendChild(img);
+      const inspect = document.createElement('button');
+      inspect.type = 'button';
+      inspect.className = 'panel-inspect';
+      inspect.setAttribute('aria-label', `View ${panel.label} at actual size`);
+      inspect.setAttribute('aria-haspopup', 'dialog');
+      const affordance = document.createElement('span');
+      affordance.className = 'panel-inspect-hint';
+      affordance.textContent = '⛶ View actual size';
+      affordance.setAttribute('aria-hidden', 'true');
+      inspect.append(img, affordance);
+      inspect.addEventListener('click', () => inspectImage(panel, download.download, inspect));
+      figure.appendChild(inspect);
 
       if (panel.caption) {
         const caption = document.createElement('figcaption');

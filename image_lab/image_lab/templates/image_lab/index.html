@@ -252,5 +252,6 @@
 
 {% block scripts %}
 <script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
-<script src="{% static 'image_lab/js/app.js' %}?v=fft-deblur-1"></script>
+<script src="{% static 'image_lab/js/image-inspector.js' %}?v=inspector-1"></script>
+<script src="{% static 'image_lab/js/app.js' %}?v=inspector-1"></script>
 {% endblock %}

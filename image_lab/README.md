@@ -33,3 +33,18 @@ Open <http://127.0.0.1:8000/>. There is no database and no migration step.
 python manage.py test image_lab     # 23 tests
 python manage.py check
 ```
+### Result image inspector
+
+Click any result image (or focus it and press Enter) to inspect the downloadable
+PNG. Comparison cards keep their existing preview dimensions. The inspector
+starts at 1:1: one image pixel occupies one CSS pixel, subject to browser zoom
+and display density. Fit to screen shrinks oversized images without enlarging
+small ones. Use +/− to zoom, drag or scroll to pan, and Escape, the backdrop, or
+× to close. Dimensions come from the loaded export, and the download link uses
+the same URL and filename as the card.
+
+Browser regression coverage (requires Node.js, Playwright, and Chrome): start
+`python manage.py runserver 127.0.0.1:8765`, then run
+`node browser_tests/inspector.cjs`. Set `TEST_URL` to use another local server.
+The test uploads a generated PNG and checks all four operations, native export
+sizes, zoom/pan/fit, keyboard focus, close controls, mobile layout, and load errors.
