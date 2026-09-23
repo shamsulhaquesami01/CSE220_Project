@@ -184,6 +184,14 @@
       <h2><span class="step">03</span> Rebuild what motion erased</h2>
 
       <div class="field">
+        <label for="deblur-input-mode">Input mode</label>
+        <select id="deblur-input-mode">
+          <option value="uploaded">Deblur uploaded image</option>
+          <option value="simulate">Simulate blur, then restore</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label for="deblur-length">Motion length <output id="deblur-length-out">17 px</output></label>
         <input type="range" id="deblur-length" min="1" max="61" step="1" value="17">
       </div>
@@ -193,7 +201,7 @@
         <input type="range" id="deblur-angle" min="-90" max="90" step="1" value="18">
       </div>
 
-      <div class="field">
+      <div class="field" data-deblur-sim>
         <label for="deblur-noise">Sensor noise &sigma; <output id="deblur-noise-out">0.012</output></label>
         <input type="range" id="deblur-noise" min="0" max="0.08" step="0.001" value="0.012">
       </div>
@@ -208,12 +216,16 @@
         <input type="range" id="deblur-floor" min="-7" max="-1" step="0.25" value="-3">
       </div>
 
-      <div class="field">
+      <div class="field" data-deblur-sim>
         <label for="deblur-seed">Noise seed</label>
         <input type="number" id="deblur-seed" min="0" max="999999" value="0">
       </div>
 
-      <p class="fineprint">
+      <p class="fineprint" data-deblur-copy="uploaded">
+        The upload is treated as the blurred observation. Set the motion length and angle
+        to match the camera movement; no additional blur or noise is added.
+      </p>
+      <p class="fineprint" data-deblur-copy="simulate" hidden>
         This experiment works in the Fourier domain: G = H&middot;F + N. Direct inverse
         filtering divides by H; Wiener restoration regularises frequencies where the blur
         transfer function is almost zero.
@@ -253,5 +265,5 @@
 {% block scripts %}
 <script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
 <script src="{% static 'image_lab/js/image-inspector.js' %}?v=inspector-1"></script>
-<script src="{% static 'image_lab/js/app.js' %}?v=inspector-1"></script>
+<script src="{% static 'image_lab/js/app.js' %}?v=deblur-upload-1"></script>
 {% endblock %}

@@ -33,6 +33,24 @@ Open <http://127.0.0.1:8000/>. There is no database and no migration step.
 python manage.py test image_lab     # 23 tests
 python manage.py check
 ```
+
+### Upload storage
+
+Local uploads are normalised to PNG and saved in `media/uploads`; generated
+panels are cached in `media/results`. On Vercel, both groups are stored in the
+connected Vercel Blob store under `uploads/` and `results/`, so they survive
+between serverless requests. Images larger than the configured 720-pixel edge
+limit are resized during upload.
+
+### Motion deblurring
+
+“Deblur uploaded image” treats the upload as the already-blurred observation
+and applies direct inverse and Wiener deconvolution using the selected motion
+length and angle. It does not add another blur. This is non-blind restoration,
+so the user supplies the estimated blur parameters; PSNR and SSIM are omitted
+because no clean reference exists. “Simulate blur, then restore” preserves the
+controlled teaching experiment and its reference-based quality metrics.
+
 ### Result image inspector
 
 Click any result image (or focus it and press Enter) to inspect the downloadable

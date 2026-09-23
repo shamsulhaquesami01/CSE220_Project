@@ -122,6 +122,7 @@
     }
     if (state.op === 'deblur') {
       return {
+        input_mode: $('#deblur-input-mode').value,
         motion_length: parseFloat($('#deblur-length').value),
         motion_angle: parseFloat($('#deblur-angle').value),
         noise_sigma: parseFloat($('#deblur-noise').value),
@@ -327,6 +328,14 @@
     return (10 ** parseFloat(value)).toExponential(1);
   }
 
+  function syncDeblurVisibility() {
+    const simulating = $('#deblur-input-mode').value === 'simulate';
+    $$('[data-deblur-sim]').forEach((el) => { el.hidden = !simulating; });
+    $$('[data-deblur-copy]').forEach((el) => {
+      el.hidden = el.dataset.deblurCopy !== $('#deblur-input-mode').value;
+    });
+  }
+
   function init() {
     state.kernel = identityKernel(3);
     renderKernel();
@@ -430,6 +439,10 @@
     $('#noise-seed').addEventListener('change', () => scheduleRun(0));
     $('#noise-pad').addEventListener('change', () => scheduleRun(0));
 
+    $('#deblur-input-mode').addEventListener('change', () => {
+      syncDeblurVisibility();
+      scheduleRun(0);
+    });
     $('#deblur-length').addEventListener('input', (e) => {
       $('#deblur-length-out').textContent = `${parseFloat(e.target.value).toFixed(0)} px`;
       scheduleRun();
@@ -453,6 +466,7 @@
     $('#deblur-seed').addEventListener('change', () => scheduleRun(0));
 
     syncNoiseVisibility();
+    syncDeblurVisibility();
   }
 
   document.addEventListener('DOMContentLoaded', init);

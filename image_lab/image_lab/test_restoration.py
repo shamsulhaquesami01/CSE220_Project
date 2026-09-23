@@ -63,6 +63,53 @@ class MotionRestorationTests(SimpleTestCase):
         # the corrupted observation.
         self.assertGreater(dsp.psnr(image, wiener), dsp.psnr(image, degraded))
 
+    def test_uploaded_observation_is_not_blurred_again(self):
+        y, x = np.mgrid[:48, :56]
+        observed = ((x // 7 + y // 7) % 2).astype(np.float64)
+        inverse, wiener, _ = dsp.motion_deblur_observation(
+            observed,
+            length=1,
+            angle=0,
+            wiener_k=1e-10,
+            inverse_floor=1e-8,
+        )
+        np.testing.assert_allclose(inverse, observed, atol=1e-10)
+        np.testing.assert_allclose(wiener, observed, atol=1e-8)
+
+    def test_uploaded_mode_restores_a_generated_degraded_signal(self):
+        y, x = np.mgrid[:48, :56]
+        image = (0.2 + 0.6 * ((x // 7 + y // 7) % 2)).astype(np.float64)
+        _, degraded, _, _, _ = dsp.motion_deblur_experiment(
+            image,
+            length=9,
+            angle=14,
+            noise_sigma=0,
+            wiener_k=2e-3,
+            inverse_floor=1e-3,
+        )
+        inverse, wiener, _ = dsp.motion_deblur_observation(
+            degraded,
+            length=9,
+            angle=14,
+            wiener_k=2e-3,
+            inverse_floor=1e-3,
+        )
+        self.assertEqual(inverse.shape, image.shape)
+        self.assertEqual(wiener.shape, image.shape)
+        self.assertTrue(np.isfinite(inverse).all())
+        self.assertTrue(np.isfinite(wiener).all())
+
+    def test_uploaded_mode_has_no_fake_reference_metrics(self):
+        image = np.random.default_rng(8).random((32, 40, 3))
+        result = OPERATIONS["deblur"].handler(
+            image,
+            {"input_mode": "uploaded", "motion_length": 9, "motion_angle": 12},
+        )
+        self.assertEqual(result.panels[0].key, "observed")
+        self.assertNotIn("degraded", {panel.key for panel in result.panels})
+        self.assertFalse(any("PSNR" in metric.label for metric in result.metrics))
+        self.assertFalse(any("SSIM" in metric.label for metric in result.metrics))
+
     def test_deblur_operation_is_registered(self):
         self.assertIn("deblur", OPERATIONS)
         image = np.random.default_rng(9).random((32, 32, 3))

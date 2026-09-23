@@ -475,6 +475,68 @@ def _frequency_restore_plane(
     )
 
 
+def _frequency_deblur_observation_plane(
+    plane,
+    psf,
+    wiener_k,
+    inverse_floor,
+):
+    """Restore an observed blurred plane without degrading it first."""
+    margin = max(psf.shape)
+    observed_pad = np.pad(
+        np.asarray(plane, dtype=np.float64),
+        ((margin, margin), (margin, margin)),
+        mode="reflect",
+    )
+    h = psf_to_otf(psf, observed_pad.shape)
+    g = np.fft.fft2(observed_pad)
+    abs_h = np.abs(h)
+
+    inverse_spectrum = np.zeros_like(g)
+    stable = abs_h >= inverse_floor
+    inverse_spectrum[stable] = g[stable] / h[stable]
+    inverse_pad = np.real(np.fft.ifft2(inverse_spectrum))
+
+    wiener_spectrum = g * np.conj(h) / (abs_h ** 2 + wiener_k)
+    wiener_pad = np.real(np.fft.ifft2(wiener_spectrum))
+    crop = (slice(margin, -margin), slice(margin, -margin))
+    return (
+        np.clip(inverse_pad[crop], 0.0, 1.0),
+        np.clip(wiener_pad[crop], 0.0, 1.0),
+    )
+
+
+def motion_deblur_observation(
+    image,
+    length=17,
+    angle=0.0,
+    wiener_k=1e-3,
+    inverse_floor=1e-3,
+):
+    """Deblur an uploaded observation using a user-specified motion PSF."""
+    image = np.asarray(image, dtype=np.float64)
+    psf = motion_psf(length, angle)
+    if image.ndim == 2:
+        inverse, wiener = _frequency_deblur_observation_plane(
+            image, psf, wiener_k, inverse_floor
+        )
+        return inverse, wiener, psf
+
+    inverse_channels = []
+    wiener_channels = []
+    for channel in range(image.shape[-1]):
+        inverse, wiener = _frequency_deblur_observation_plane(
+            image[..., channel], psf, wiener_k, inverse_floor
+        )
+        inverse_channels.append(inverse)
+        wiener_channels.append(wiener)
+    return (
+        np.stack(inverse_channels, axis=-1),
+        np.stack(wiener_channels, axis=-1),
+        psf,
+    )
+
+
 def motion_deblur_experiment(
     image,
     length=17,

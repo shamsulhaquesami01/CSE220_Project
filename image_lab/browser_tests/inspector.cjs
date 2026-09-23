@@ -31,7 +31,6 @@ const assert = require('node:assert/strict');
       await page.locator('#spinner').waitFor({ state: 'hidden' });
       const count = await page.locator('.panel-inspect').count();
       for (let i = 0; i < count; i++) {
-        console.log('Checking', op, i);
         const trigger = page.locator('.panel-inspect').nth(i);
         await trigger.focus(); await page.keyboard.press('Enter'); await loaded();
         const info = await page.locator('.inspector-stage img').evaluate(img => ({ w: img.naturalWidth, h: img.naturalHeight, width: img.getBoundingClientRect().width, height: img.getBoundingClientRect().height, src: img.src }));
@@ -43,6 +42,22 @@ const assert = require('node:assert/strict');
         assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
       }
     }
+    await page.locator('[data-op="deblur"]').click();
+    await page.waitForFunction(() => document.querySelector('.panel-download')?.download.startsWith('image-lab-deblur-'));
+    assert.equal(await page.locator('#deblur-input-mode').inputValue(), 'uploaded');
+    assert.equal(await page.locator('[data-deblur-sim]').first().isHidden(), true);
+    assert.deepEqual(
+      await page.locator('.panel-head strong').allTextContents(),
+      ['Uploaded blurred image', 'Direct inverse', 'Wiener restoration', 'Blur transfer |H(u,v)|']
+    );
+    assert.equal(await page.locator('#metrics-table').getByText('PSNR', { exact: false }).count(), 0);
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/api/process/')),
+      page.locator('#deblur-input-mode').selectOption('simulate'),
+    ]);
+    assert.equal(await page.locator('[data-deblur-sim]').first().isVisible(), true);
+    assert.equal(await page.locator('.panel-head strong').filter({ hasText: 'Camera-shake model' }).count(), 1);
+    assert.ok(await page.locator('#metrics-table').getByText('PSNR degraded', { exact: true }).count());
     await page.locator('.panel-inspect').first().click(); await loaded();
     for (let i = 0; i < 5; i++) await dialog.getByRole('button', { name: 'Zoom in', exact: true }).click();
     const viewport = page.locator('.inspector-viewport');
