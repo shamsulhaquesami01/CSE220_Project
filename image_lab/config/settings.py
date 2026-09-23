@@ -34,9 +34,18 @@ def _get_secret_key():
 
 SECRET_KEY = _get_secret_key()
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+# Keep the detailed Django debug page for local development, but default to
+# production-safe behaviour on Vercel unless DJANGO_DEBUG is explicitly set.
+DEBUG = os.environ.get("DJANGO_DEBUG", "0" if os.environ.get("VERCEL") else "1") == "1"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+# Django accepts a leading dot as "this domain and all subdomains", so this
+# covers the production hostname as well as Vercel preview deployment URLs.
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+    ".vercel.app",
+]
 
 
 INSTALLED_APPS = [
