@@ -36,28 +36,22 @@ _BLOB_ENDPOINT = "https://vercel.com/api/blob"
 _BLOB_ID_PREFIX = "blob_"
 
 
-def _system_env(name: str) -> str | None:
-    """Read a Vercel system environment variable.
-
-    Normal project variables are available through os.environ. Vercel's Python
-    runtime also exposes system variables through vercel.functions.get_env().
-    """
-    value = os.environ.get(name)
-    if value:
-        return value
-
-    try:
-        from vercel.functions import get_env
-
-        env = get_env()
-        return getattr(env, name, None)
-    except Exception:
-        return None
-
-
 def _blob_auth() -> tuple[str | None, str | None]:
-    """Return (bearer_token, bare_store_id) for Vercel Blob."""
-    oidc = _system_env("VERCEL_OIDC_TOKEN")
+    """Return (bearer_token, bare_store_id) for Vercel Blob.
+
+    Vercel's Python SDK resolves the rotating OIDC token from the current
+    request context. A static Blob read/write token remains supported as a
+    compatibility fallback.
+    """
+    oidc = os.environ.get("VERCEL_OIDC_TOKEN")
+    if not oidc and os.environ.get("VERCEL"):
+        try:
+            from vercel.oidc import get_vercel_oidc_token
+
+            oidc = get_vercel_oidc_token()
+        except Exception:
+            oidc = None
+
     store_id = os.environ.get("BLOB_STORE_ID")
 
     if oidc and store_id:
