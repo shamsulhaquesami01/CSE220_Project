@@ -1,19 +1,27 @@
 """
 imaging.py
 
-The only place in the project that talks to Pillow and to the filesystem.
+Image/file I/O for Image Lab.
 
-Keeping all I/O here means `dsp_utils` stays a pure NumPy module with no
-third-party dependencies, so the algorithms the course is actually grading can
-be imported and tested without Django or Pillow present.
+Local development uses MEDIA_ROOT just like before. On Vercel, if a Vercel Blob
+store is connected, uploads and generated result PNGs are stored in Blob so
+they survive across serverless requests and remain downloadable.
+
+The DSP core remains pure NumPy and is intentionally unaware of storage.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import json
+import os
 import uuid
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlparse
+from urllib.request import Request, urlopen
 
 import numpy as np
 from django.conf import settings
@@ -21,31 +29,55 @@ from PIL import Image
 
 from . import dsp_utils as dsp
 
-# Formats we accept on upload. Anything Pillow can decode would work, but a
-# short allowlist avoids surprises with exotic or animated formats.
+
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
 
+_BLOB_ENDPOINT = "https://blob.vercel-storage.com"
+_BLOB_ID_PREFIX = "blob_"
 
-# Return the directory uploads are written to, creating it if needed.
+
+def _blob_token() -> str | None:
+    return os.environ.get("BLOB_READ_WRITE_TOKEN")
+
+
+def using_blob() -> bool:
+    return bool(_blob_token())
+
+
+def _ensure_storage_ready() -> None:
+    if os.environ.get("VERCEL") and not using_blob():
+        raise ValueError(
+            "Image storage is not configured for this deployment. "
+            "Connect a Vercel Blob store to the project and redeploy."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Local filesystem backend
+# ---------------------------------------------------------------------------
+
+
 def upload_dir() -> Path:
     path = Path(settings.MEDIA_ROOT) / settings.UPLOAD_SUBDIR
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-# Return the directory generated panels are written to, creating it if needed.
 def result_dir() -> Path:
     path = Path(settings.MEDIA_ROOT) / settings.RESULT_SUBDIR
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-# Return the media URL for a file living under MEDIA_ROOT.
 def media_url(relative_path: str) -> str:
     return f"{settings.MEDIA_URL}{relative_path}".replace("\\", "/")
 
 
-# Downscale an image so its longest edge is at most max_dim, preserving aspect.
+# ---------------------------------------------------------------------------
+# Shared image encode/decode helpers
+# ---------------------------------------------------------------------------
+
+
 def _fit_within(image: np.ndarray, max_dim: int) -> np.ndarray:
     height, width = image.shape[:2]
     longest = max(height, width)
@@ -55,18 +87,128 @@ def _fit_within(image: np.ndarray, max_dim: int) -> np.ndarray:
     scale = max_dim / float(longest)
     out_h = max(1, int(round(height * scale)))
     out_w = max(1, int(round(width * scale)))
-    # Anti-aliased on purpose: the ingest downscale is itself a decimation, and
-    # letting it alias would corrupt every experiment run afterwards.
     return dsp.resize(image, out_h, out_w, method="bilinear", antialias=True)
 
 
-# Save an uploaded file to MEDIA_ROOT and return its identifier and geometry.
+def _png_bytes(image: np.ndarray) -> bytes:
+    data = dsp.to_uint8(image)
+    mode = "L" if data.ndim == 2 else "RGB"
+    buffer = io.BytesIO()
+    Image.fromarray(data, mode=mode).save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
+def _decode_image_bytes(payload: bytes) -> np.ndarray:
+    with Image.open(io.BytesIO(payload)) as handle:
+        mode = "RGB" if handle.mode != "L" else "L"
+        array = np.asarray(handle.convert(mode))
+    return dsp.to_float(array)
+
+
+# ---------------------------------------------------------------------------
+# Vercel Blob backend
+# ---------------------------------------------------------------------------
+
+
+def _blob_put(pathname: str, payload: bytes, content_type: str = "image/png") -> str:
+    token = _blob_token()
+    if not token:
+        raise RuntimeError("Vercel Blob is not configured.")
+
+    # Vercel Blob's server upload endpoint accepts the pathname in the URL and
+    # authenticates with the read/write token injected when the store is linked.
+    request = Request(
+        f"{_BLOB_ENDPOINT}/{quote(pathname, safe='/')}",
+        data=payload,
+        method="PUT",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": content_type,
+            "x-api-version": "7",
+            "x-add-random-suffix": "1",
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Vercel Blob upload failed ({exc.code}): {detail[:300]}"
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(f"Could not reach Vercel Blob: {exc.reason}") from exc
+
+    try:
+        result = json.loads(raw)
+        return result["url"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise RuntimeError("Vercel Blob returned an invalid response.") from exc
+
+
+def _blob_get(url: str) -> bytes:
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or not parsed.hostname.endswith(".blob.vercel-storage.com")
+    ):
+        raise ValueError("Malformed Blob URL")
+
+    request = Request(url)
+    try:
+        with urlopen(request, timeout=30) as response:
+            return response.read()
+    except HTTPError as exc:
+        if exc.code == 404:
+            raise FileNotFoundError(
+                "That image is no longer available. Please re-upload."
+            ) from exc
+        raise RuntimeError(f"Vercel Blob read failed ({exc.code}).") from exc
+    except URLError as exc:
+        raise RuntimeError(f"Could not reach Vercel Blob: {exc.reason}") from exc
+
+
+def _encode_blob_id(url: str) -> str:
+    encoded = base64.urlsafe_b64encode(url.encode("utf-8")).decode("ascii")
+    return _BLOB_ID_PREFIX + encoded.rstrip("=")
+
+
+def _decode_blob_id(image_id: str) -> str:
+    if not image_id.startswith(_BLOB_ID_PREFIX):
+        raise ValueError("Malformed image id")
+
+    encoded = image_id[len(_BLOB_ID_PREFIX):]
+    encoded += "=" * (-len(encoded) % 4)
+    try:
+        url = base64.urlsafe_b64decode(encoded.encode("ascii")).decode("utf-8")
+    except Exception as exc:
+        raise ValueError("Malformed image id") from exc
+
+    parsed = urlparse(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or not parsed.hostname.endswith(".blob.vercel-storage.com")
+    ):
+        raise ValueError("Malformed image id")
+    return url
+
+
+# ---------------------------------------------------------------------------
+# Public storage API used by views.py
+# ---------------------------------------------------------------------------
+
+
 def store_upload(uploaded_file, grayscale: bool = False) -> dict:
     suffix = Path(uploaded_file.name).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
         raise ValueError(
             f"Unsupported file type '{suffix}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
         )
+
+    _ensure_storage_ready()
 
     with Image.open(uploaded_file) as handle:
         handle.draft(None, None)
@@ -76,37 +218,49 @@ def store_upload(uploaded_file, grayscale: bool = False) -> dict:
     image = dsp.to_float(array)
     image = _fit_within(image, settings.IMAGE_LAB_MAX_DIM)
 
-    # Store the ingest-normalised image as PNG so every later stage reads back
-    # exactly the pixels the DSP code worked on, with no JPEG re-compression.
     image_id = uuid.uuid4().hex
     filename = f"{image_id}.png"
-    save_array(image, upload_dir() / filename)
+
+    if using_blob():
+        blob_url = _blob_put(
+            f"{settings.UPLOAD_SUBDIR}/{filename}",
+            _png_bytes(image),
+        )
+        returned_id = _encode_blob_id(blob_url)
+        image_url = blob_url
+    else:
+        save_array(image, upload_dir() / filename)
+        returned_id = image_id
+        image_url = media_url(f"{settings.UPLOAD_SUBDIR}/{filename}")
 
     height, width = image.shape[:2]
     return {
-        "image_id": image_id,
-        "url": media_url(f"{settings.UPLOAD_SUBDIR}/{filename}"),
+        "image_id": returned_id,
+        "url": image_url,
         "width": int(width),
         "height": int(height),
         "channels": 1 if image.ndim == 2 else int(image.shape[2]),
     }
 
 
-# Load a previously uploaded image by id as a float array in [0, 1].
 def load_upload(image_id: str) -> np.ndarray:
+    if image_id.startswith(_BLOB_ID_PREFIX):
+        return _decode_image_bytes(_blob_get(_decode_blob_id(image_id)))
+
     if not image_id or not image_id.isalnum():
         raise ValueError("Malformed image id")
 
     path = upload_dir() / f"{image_id}.png"
     if not path.exists():
-        raise FileNotFoundError("That image is no longer on the server. Please re-upload.")
+        raise FileNotFoundError(
+            "That image is no longer on the server. Please re-upload."
+        )
 
     with Image.open(path) as handle:
         array = np.asarray(handle.convert("RGB" if handle.mode != "L" else "L"))
     return dsp.to_float(array)
 
 
-# Write a float array in [0, 1] to disk as a PNG.
 def save_array(image: np.ndarray, path: Path) -> Path:
     data = dsp.to_uint8(image)
     mode = "L" if data.ndim == 2 else "RGB"
@@ -114,7 +268,6 @@ def save_array(image: np.ndarray, path: Path) -> Path:
     return path
 
 
-# Return a short deterministic digest of the request that produced a panel.
 def panel_digest(image_id: str, op_id: str, params: dict, panel_key: str) -> str:
     payload = json.dumps(
         {"image": image_id, "op": op_id, "params": params, "panel": panel_key},
@@ -124,23 +277,43 @@ def panel_digest(image_id: str, op_id: str, params: dict, panel_key: str) -> str
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
 
 
-# Persist a result panel, reusing the file when the same request repeats.
-def save_panel(image: np.ndarray, image_id: str, op_id: str, params: dict, panel_key: str) -> str:
+def save_panel(
+    image: np.ndarray,
+    image_id: str,
+    op_id: str,
+    params: dict,
+    panel_key: str,
+) -> str:
     digest = panel_digest(image_id, op_id, params, panel_key)
+
+    if using_blob():
+        # Hash the image id rather than putting the encoded Blob URL in the
+        # pathname. This keeps result paths short and opaque.
+        source_key = hashlib.sha1(image_id.encode("utf-8")).hexdigest()[:12]
+        filename = f"{source_key}_{op_id}_{panel_key}_{digest}.png"
+        return _blob_put(
+            f"{settings.RESULT_SUBDIR}/{filename}",
+            _png_bytes(image),
+        )
+
     filename = f"{image_id}_{op_id}_{panel_key}_{digest}.png"
     path = result_dir() / filename
-
-    # Content-addressed by request, so an identical re-run is a cache hit. The
-    # live preview fires on every slider drag, and this keeps that cheap.
     if not path.exists():
         save_array(image, path)
-
     return media_url(f"{settings.RESULT_SUBDIR}/{filename}")
 
 
-# Delete generated panels beyond the newest `keep` files.
 def prune_results(keep: int = 400) -> int:
-    files = sorted(result_dir().glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
+    # Blob objects are not pruned here because they may live on another
+    # serverless instance. Local development keeps the previous bounded cache.
+    if using_blob():
+        return 0
+
+    files = sorted(
+        result_dir().glob("*.png"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     removed = 0
     for stale in files[keep:]:
         try:
