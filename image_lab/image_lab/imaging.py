@@ -37,7 +37,19 @@ _BLOB_ID_PREFIX = "blob_"
 
 
 def _blob_token() -> str | None:
-    return os.environ.get("BLOB_READ_WRITE_TOKEN")
+    # Standard Vercel Blob connection name.
+    token = os.environ.get("BLOB_READ_WRITE_TOKEN")
+    if token:
+        return token
+
+    # If the Blob resource was connected with a custom environment-variable
+    # prefix, Vercel keeps the BLOB_READ_WRITE_TOKEN suffix. Accept that form
+    # too so the deployment does not depend on the dashboard prefix choice.
+    for key, value in os.environ.items():
+        if key.endswith("BLOB_READ_WRITE_TOKEN") and value:
+            return value
+
+    return None
 
 
 def using_blob() -> bool:
