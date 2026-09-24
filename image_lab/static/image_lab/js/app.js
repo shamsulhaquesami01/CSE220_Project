@@ -392,9 +392,9 @@
 
   function syncMatchVisibility() {
     const real = $('#match-input-mode').value === 'real';
-    $('[data-match-real]').forEach((el) => { el.hidden = !real; });
-    $('[data-match-controlled]').forEach((el) => { el.hidden = real; });
-    $('[data-match-copy]').forEach((el) => {
+    document.querySelectorAll('[data-match-real]').forEach((el) => { el.hidden = !real; });
+    document.querySelectorAll('[data-match-controlled]').forEach((el) => { el.hidden = real; });
+    document.querySelectorAll('[data-match-copy]').forEach((el) => {
       el.hidden = el.dataset.matchCopy !== $('#match-input-mode').value;
     });
   }
