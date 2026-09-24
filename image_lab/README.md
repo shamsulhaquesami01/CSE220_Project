@@ -66,3 +66,83 @@ Browser regression coverage (requires Node.js, Playwright, and Chrome): start
 `node browser_tests/inspector.cjs`. Set `TEST_URL` to use another local server.
 The test uploads a generated PNG and checks all four operations, native export
 sizes, zoom/pan/fit, keyboard focus, close controls, mobile layout, and load errors.
+
+
+## Spectral Rescue: periodic obstruction removal
+
+Spectral Rescue targets **repetitive visual interference**, not arbitrary opaque
+foreground objects. It is designed for regular mesh/screen patterns, horizontal
+or vertical scan lines, periodic stripes, regular banding, and similar
+near-periodic contamination.
+
+The pipeline is:
+
+1. Convert the observed image to luminance and compute a centred 2-D FFT.
+2. Display the log-magnitude spectrum.
+3. Ignore a configurable low-frequency centre region.
+4. Estimate the slowly varying spectral background.
+5. Detect narrow local spectral anomalies with a robust MAD-based threshold.
+6. Pair conjugate-symmetric peaks.
+7. Merge automatic peaks with manually clicked spectrum locations.
+8. Build smooth symmetric Gaussian notch-reject filters.
+9. Apply the same frequency mask to each image channel.
+10. Reconstruct with the inverse FFT.
+
+The experiment has two modes:
+
+- **Simulate + recover** adds controlled periodic interference to the uploaded
+  clean image. This is the recommended first test because PSNR and SSIM can
+  verify whether reconstruction actually improved the image.
+- **Clean an uploaded obstruction** treats the upload as an already-corrupted
+  real image. It intentionally does not report PSNR/SSIM because no clean
+  reference exists.
+
+### Spectral Rescue controls
+
+- Interference preset: horizontal, vertical, diagonal, grid, multi-frequency mesh
+- Pattern frequency, strength, and angle for controlled simulation
+- Automatic peak detection on/off
+- Detection sensitivity
+- Ignore-centre radius
+- Maximum automatic peak pairs
+- Require conjugate-symmetric evidence
+- Notch radius
+- Notch softness
+- Peak marker display
+- Manual peak selection by clicking the Fourier-spectrum panel
+- Clear manual peaks
+
+Clicking one spectrum location automatically creates the conjugate-symmetric
+partner. This keeps the filtered spectrum compatible with a real-valued inverse
+FFT.
+
+The result panels include the original/reference when available, corrupted
+observation, annotated Fourier spectrum, notch mask, reconstructed image,
+filtered spectrum, and the suppressed component.
+
+### Recommended Spectral Rescue test
+
+Start with any detailed photograph and use **Simulate + recover**:
+
+- preset: Two-direction grid
+- frequency: 24 cycles/image
+- strength: 16%
+- angle: 25 degrees
+- auto detect: on
+- sensitivity: 6/10
+- centre radius: 5%
+- max pairs: 5
+- notch radius: 4 px
+- notch softness: 1.0
+
+Confirm that the bright symmetric peaks are marked, dark holes appear in the
+notch mask, and PSNR/SSIM improve after reconstruction.
+
+Then try uploaded-mode images containing fine screens, scanlines, regular
+stripes, or sensor banding. For real images, tune sensitivity first, then notch
+radius. If automation misses a visible Fourier peak, click it manually.
+
+This method is **not expected to remove** people, branches, irregular fences,
+large opaque bars, or arbitrary objects that completely hide scene content.
+Those problems require additional observations, inpainting/ML, or multi-frame
+computer-vision methods.
