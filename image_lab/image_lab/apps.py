@@ -10,3 +10,4 @@ class ImageLabConfig(AppConfig):
         # Import advanced experiment modules for their @register side effects.
         # Keeping them separate prevents operations.py from becoming a monolith.
         from . import restoration  # noqa: F401
+        from . import spectral_match  # noqa: F401
