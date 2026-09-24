@@ -25,6 +25,7 @@
     kernel: null,
     inFlight: null,
     timer: null,
+    manualPeaks: [],
   };
 
   function identityKernel(n) {
@@ -131,6 +132,24 @@
         seed: parseInt($('#deblur-seed').value, 10) || 0,
       };
     }
+    if (state.op === 'spectral_rescue') {
+      return {
+        input_mode: $('#spectral-input-mode').value,
+        pattern: $('#spectral-pattern').value,
+        pattern_frequency: parseFloat($('#spectral-frequency').value),
+        pattern_amplitude: parseFloat($('#spectral-amplitude').value),
+        pattern_angle: parseFloat($('#spectral-angle').value),
+        auto_detect: $('#spectral-auto-detect').checked,
+        sensitivity: parseFloat($('#spectral-sensitivity').value),
+        ignore_center: parseFloat($('#spectral-ignore-center').value),
+        max_pairs: parseInt($('#spectral-max-pairs').value, 10),
+        require_symmetric: $('#spectral-require-symmetric').checked,
+        notch_radius: parseFloat($('#spectral-notch-radius').value),
+        notch_softness: parseFloat($('#spectral-notch-softness').value),
+        show_markers: $('#spectral-show-markers').checked,
+        manual_peaks: state.manualPeaks,
+      };
+    }
     return {};
   }
 
@@ -198,6 +217,7 @@
       }
 
       state.imageId = data.image_id;
+      state.manualPeaks = [];
       status.textContent = `Loaded ${data.width} × ${data.height}, ${data.channels === 1 ? 'grayscale' : 'RGB'}.`;
       status.className = 'status is-ok';
 
@@ -252,10 +272,24 @@
       inspect.setAttribute('aria-haspopup', 'dialog');
       const affordance = document.createElement('span');
       affordance.className = 'panel-inspect-hint';
-      affordance.textContent = '⛶ View actual size';
+      const isSpectralPicker = data.op === 'spectral_rescue' && panel.key === 'spectrum';
+      affordance.textContent = isSpectralPicker ? '+ Add/remove notch' : '⛶ View actual size';
       affordance.setAttribute('aria-hidden', 'true');
       inspect.append(img, affordance);
-      inspect.addEventListener('click', () => inspectImage(panel, download.download, inspect));
+
+      if (isSpectralPicker) {
+        inspect.setAttribute('aria-label', 'Click a Fourier-spectrum peak to add or remove a manual notch');
+        inspect.removeAttribute('aria-haspopup');
+        inspect.addEventListener('click', (event) => {
+          const rect = img.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+          const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+          toggleManualPeak(x, y);
+        });
+      } else {
+        inspect.addEventListener('click', () => inspectImage(panel, download.download, inspect));
+      }
       figure.appendChild(inspect);
 
       if (panel.caption) {
@@ -326,6 +360,28 @@
 
   function scientificFromLog(value) {
     return (10 ** parseFloat(value)).toExponential(1);
+  }
+
+  function toggleManualPeak(x, y) {
+    const threshold = 0.035;
+    const index = state.manualPeaks.findIndex((point) =>
+      Math.hypot(point.x - x, point.y - y) < threshold
+    );
+    if (index >= 0) {
+      state.manualPeaks.splice(index, 1);
+    } else {
+      state.manualPeaks.push({ x, y });
+      if (state.manualPeaks.length > 16) state.manualPeaks.shift();
+    }
+    scheduleRun(0);
+  }
+
+  function syncSpectralVisibility() {
+    const simulating = $('#spectral-input-mode').value === 'simulate';
+    $('[data-spectral-sim]').forEach((el) => { el.hidden = !simulating; });
+    $('[data-spectral-copy]').forEach((el) => {
+      el.hidden = el.dataset.spectralCopy !== $('#spectral-input-mode').value;
+    });
   }
 
   function syncDeblurVisibility() {
@@ -465,8 +521,55 @@
     });
     $('#deblur-seed').addEventListener('change', () => scheduleRun(0));
 
+    $('#spectral-input-mode').addEventListener('change', () => {
+      state.manualPeaks = [];
+      syncSpectralVisibility();
+      scheduleRun(0);
+    });
+    $('#spectral-pattern').addEventListener('change', () => scheduleRun(0));
+    $('#spectral-frequency').addEventListener('input', (e) => {
+      $('#spectral-frequency-out').textContent = `${parseFloat(e.target.value).toFixed(0)} cycles/image`;
+      scheduleRun();
+    });
+    $('#spectral-amplitude').addEventListener('input', (e) => {
+      $('#spectral-amplitude-out').textContent = `${(parseFloat(e.target.value) * 100).toFixed(0)}%`;
+      scheduleRun();
+    });
+    $('#spectral-angle').addEventListener('input', (e) => {
+      $('#spectral-angle-out').innerHTML = `${parseFloat(e.target.value).toFixed(0)}&deg;`;
+      scheduleRun();
+    });
+    $('#spectral-auto-detect').addEventListener('change', () => scheduleRun(0));
+    $('#spectral-sensitivity').addEventListener('input', (e) => {
+      $('#spectral-sensitivity-out').textContent = `${parseFloat(e.target.value).toFixed(1)} / 10`;
+      scheduleRun();
+    });
+    $('#spectral-ignore-center').addEventListener('input', (e) => {
+      $('#spectral-ignore-center-out').textContent = `${(parseFloat(e.target.value) * 100).toFixed(1)}%`;
+      scheduleRun();
+    });
+    $('#spectral-max-pairs').addEventListener('input', (e) => {
+      $('#spectral-max-pairs-out').textContent = e.target.value;
+      scheduleRun();
+    });
+    $('#spectral-require-symmetric').addEventListener('change', () => scheduleRun(0));
+    $('#spectral-notch-radius').addEventListener('input', (e) => {
+      $('#spectral-notch-radius-out').textContent = `${parseFloat(e.target.value).toFixed(2)} px`;
+      scheduleRun();
+    });
+    $('#spectral-notch-softness').addEventListener('input', (e) => {
+      $('#spectral-notch-softness-out').textContent = `${parseFloat(e.target.value).toFixed(2)}×`;
+      scheduleRun();
+    });
+    $('#spectral-show-markers').addEventListener('change', () => scheduleRun(0));
+    $('#spectral-clear-manual').addEventListener('click', () => {
+      state.manualPeaks = [];
+      scheduleRun(0);
+    });
+
     syncNoiseVisibility();
     syncDeblurVisibility();
+    syncSpectralVisibility();
   }
 
   document.addEventListener('DOMContentLoaded', init);
