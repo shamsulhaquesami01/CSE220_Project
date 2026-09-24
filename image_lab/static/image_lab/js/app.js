@@ -21,6 +21,7 @@
 
   const state = {
     imageId: null,
+    queryImageId: null,
     op: 'convolve',
     kernel: null,
     inFlight: null,
@@ -131,6 +132,18 @@
         seed: parseInt($('#deblur-seed').value, 10) || 0,
       };
     }
+    if (state.op === 'spectral_match') {
+      return {
+        input_mode: $('#match-input-mode').value,
+        query_image_id: state.queryImageId,
+        rotation: parseFloat($('#match-rotation').value),
+        scale: parseFloat($('#match-scale').value),
+        shift_x_fraction: parseFloat($('#match-shift-x').value),
+        shift_y_fraction: parseFloat($('#match-shift-y').value),
+        use_hann: $('#match-hann').checked,
+        subpixel: $('#match-subpixel').checked,
+      };
+    }
     return {};
   }
 
@@ -141,6 +154,14 @@
 
   async function run() {
     if (!state.imageId) return;
+    if (
+      state.op === 'spectral_match'
+      && $('#match-input-mode').value === 'real'
+      && !state.queryImageId
+    ) {
+      showError('Upload a query image to run two-image Spectral Match.');
+      return;
+    }
 
     if (state.inFlight) state.inFlight.abort();
     const controller = new AbortController();
@@ -211,6 +232,39 @@
     }
   }
 
+  async function uploadQueryFile(file) {
+    const status = $('#match-query-status');
+    status.textContent = 'Uploading query…';
+    status.className = 'status';
+    hideError();
+
+    const body = new FormData();
+    body.append('image', file);
+    if ($('#opt-grayscale').checked) body.append('grayscale', '1');
+
+    try {
+      const response = await fetch('/api/upload/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF },
+        body,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        status.textContent = data.error || 'Query upload failed.';
+        status.className = 'status is-error';
+        return;
+      }
+
+      state.queryImageId = data.image_id;
+      status.textContent = 'Query loaded ' + data.width + ' × ' + data.height + ', ' + (data.channels === 1 ? 'grayscale' : 'RGB') + '.';
+      status.className = 'status is-ok';
+      if (state.op === 'spectral_match' && $('#match-input-mode').value === 'real') run();
+    } catch (err) {
+      status.textContent = 'Could not reach the server.';
+      status.className = 'status is-error';
+    }
+  }
   function renderResults(data) {
     const grid = $('#panel-grid');
     grid.replaceChildren();
@@ -336,12 +390,27 @@
     });
   }
 
+  function syncMatchVisibility() {
+    const real = $('#match-input-mode').value === 'real';
+    $('[data-match-real]').forEach((el) => { el.hidden = !real; });
+    $('[data-match-controlled]').forEach((el) => { el.hidden = real; });
+    $('[data-match-copy]').forEach((el) => {
+      el.hidden = el.dataset.matchCopy !== $('#match-input-mode').value;
+    });
+  }
+
+  function signedPercent(value) {
+    const percent = parseFloat(value) * 100;
+    return (percent >= 0 ? '+' : '') + percent.toFixed(0) + '%';
+  }
   function init() {
     state.kernel = identityKernel(3);
     renderKernel();
 
     const dropzone = $('#dropzone');
     const fileInput = $('#file-input');
+    const queryDropzone = $('#match-query-dropzone');
+    const queryFileInput = $('#match-query-file');
 
     fileInput.addEventListener('change', () => {
       if (fileInput.files[0]) uploadFile(fileInput.files[0]);
@@ -362,6 +431,26 @@
     dropzone.addEventListener('drop', (e) => {
       const file = e.dataTransfer?.files?.[0];
       if (file) uploadFile(file);
+    });
+
+    queryFileInput.addEventListener('change', () => {
+      if (queryFileInput.files[0]) uploadQueryFile(queryFileInput.files[0]);
+    });
+    ['dragenter', 'dragover'].forEach((evt) =>
+      queryDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        queryDropzone.classList.add('is-over');
+      })
+    );
+    ['dragleave', 'drop'].forEach((evt) =>
+      queryDropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        queryDropzone.classList.remove('is-over');
+      })
+    );
+    queryDropzone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) uploadQueryFile(file);
     });
 
     $('#opt-grayscale').addEventListener('change', () => {
@@ -465,8 +554,34 @@
     });
     $('#deblur-seed').addEventListener('change', () => scheduleRun(0));
 
+    $('#match-input-mode').addEventListener('change', () => {
+      syncMatchVisibility();
+      if ($('#match-input-mode').value === 'controlled' || state.queryImageId) run();
+      else showError('Upload a query image to run two-image Spectral Match.');
+    });
+    $('#match-rotation').addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      $('#match-rotation-out').innerHTML = (value >= 0 ? '+' : '') + value.toFixed(0) + '&deg;';
+      scheduleRun();
+    });
+    $('#match-scale').addEventListener('input', (e) => {
+      $('#match-scale-out').textContent = parseFloat(e.target.value).toFixed(2) + '×';
+      scheduleRun();
+    });
+    $('#match-shift-x').addEventListener('input', (e) => {
+      $('#match-shift-x-out').textContent = signedPercent(e.target.value);
+      scheduleRun();
+    });
+    $('#match-shift-y').addEventListener('input', (e) => {
+      $('#match-shift-y-out').textContent = signedPercent(e.target.value);
+      scheduleRun();
+    });
+    $('#match-hann').addEventListener('change', () => scheduleRun(0));
+    $('#match-subpixel').addEventListener('change', () => scheduleRun(0));
+
     syncNoiseVisibility();
     syncDeblurVisibility();
+    syncMatchVisibility();
   }
 
   document.addEventListener('DOMContentLoaded', init);
