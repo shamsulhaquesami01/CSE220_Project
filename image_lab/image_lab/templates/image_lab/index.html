@@ -231,6 +231,106 @@
         transfer function is almost zero.
       </p>
     </section>
+
+    <!-- Spectral periodic-obstruction removal panel ----------------------->
+    <section class="card op-panel" data-op-panel="spectral_rescue" hidden>
+      <h2><span class="step">03</span> Spectral Rescue</h2>
+
+      <div class="field">
+        <label for="spectral-input-mode">Input mode</label>
+        <select id="spectral-input-mode">
+          <option value="simulate" selected>Simulate + recover</option>
+          <option value="uploaded">Clean an uploaded obstruction</option>
+        </select>
+      </div>
+
+      <div data-spectral-sim>
+        <div class="field">
+          <label for="spectral-pattern">Interference preset</label>
+          <select id="spectral-pattern">
+            <option value="horizontal">Horizontal bands</option>
+            <option value="vertical">Vertical bands</option>
+            <option value="diagonal">Diagonal bands</option>
+            <option value="grid" selected>Two-direction grid</option>
+            <option value="mesh">Multi-frequency mesh</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="spectral-frequency">Pattern frequency <output id="spectral-frequency-out">24 cycles/image</output></label>
+          <input type="range" id="spectral-frequency" min="4" max="64" step="1" value="24">
+        </div>
+
+        <div class="field">
+          <label for="spectral-amplitude">Pattern strength <output id="spectral-amplitude-out">16%</output></label>
+          <input type="range" id="spectral-amplitude" min="0.02" max="0.35" step="0.01" value="0.16">
+        </div>
+
+        <div class="field">
+          <label for="spectral-angle">Pattern angle <output id="spectral-angle-out">25&deg;</output></label>
+          <input type="range" id="spectral-angle" min="-90" max="90" step="1" value="25">
+        </div>
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="spectral-auto-detect" checked>
+        <span>Automatically detect suspicious peak pairs</span>
+      </label>
+
+      <div class="field">
+        <label for="spectral-sensitivity">Detection sensitivity <output id="spectral-sensitivity-out">6.0 / 10</output></label>
+        <input type="range" id="spectral-sensitivity" min="1" max="10" step="0.25" value="6">
+      </div>
+
+      <div class="field">
+        <label for="spectral-ignore-center">Ignore centre radius <output id="spectral-ignore-center-out">5%</output></label>
+        <input type="range" id="spectral-ignore-center" min="0.01" max="0.20" step="0.005" value="0.05">
+      </div>
+
+      <div class="field">
+        <label for="spectral-max-pairs">Maximum automatic pairs <output id="spectral-max-pairs-out">5</output></label>
+        <input type="range" id="spectral-max-pairs" min="1" max="12" step="1" value="5">
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="spectral-require-symmetric" checked>
+        <span>Require conjugate-symmetric evidence</span>
+      </label>
+
+      <div class="field">
+        <label for="spectral-notch-radius">Notch radius <output id="spectral-notch-radius-out">4.0 px</output></label>
+        <input type="range" id="spectral-notch-radius" min="0.75" max="16" step="0.25" value="4">
+      </div>
+
+      <div class="field">
+        <label for="spectral-notch-softness">Notch softness <output id="spectral-notch-softness-out">1.00&times;</output></label>
+        <input type="range" id="spectral-notch-softness" min="0.25" max="3" step="0.05" value="1">
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="spectral-show-markers" checked>
+        <span>Show detected/manual peak markers</span>
+      </label>
+
+      <div class="row">
+        <button type="button" class="ghost" id="spectral-clear-manual">Clear manual peaks</button>
+      </div>
+
+      <p class="fineprint" data-spectral-copy="simulate">
+        A known repetitive interference pattern is added first, then detected and removed.
+        This mode reports PSNR and SSIM against the original clean image.
+      </p>
+      <p class="fineprint" data-spectral-copy="uploaded" hidden>
+        Use a real image containing regular mesh, scan lines, stripes or banding. Auto-detection
+        finds candidate Fourier peaks; click directly on the Fourier-spectrum result to add or
+        remove manual notch locations.
+      </p>
+      <p class="fineprint">
+        Tip: click a bright off-centre point on the Fourier spectrum. The conjugate partner is
+        added automatically. Click near the same location again to remove that manual pair.
+      </p>
+    </section>
+
   </aside>
 
   <!-- ------------------------------------------------------------------ -->
@@ -265,5 +365,5 @@
 {% block scripts %}
 <script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
 <script src="{% static 'image_lab/js/image-inspector.js' %}?v=inspector-1"></script>
-<script src="{% static 'image_lab/js/app.js' %}?v=deblur-upload-1"></script>
+<script src="{% static 'image_lab/js/app.js' %}?v=spectral-rescue-1"></script>
 {% endblock %}
