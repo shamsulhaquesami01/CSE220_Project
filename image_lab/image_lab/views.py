@@ -95,8 +95,22 @@ def process(request):
     except (ValueError, FileNotFoundError) as exc:
         return JsonResponse({"error": str(exc)}, status=404)
 
+    handler_params = params
+    if op_id == "spectral_match" and str(params.get("input_mode", "controlled")) == "real":
+        query_image_id = str(params.get("query_image_id", ""))
+        if not query_image_id:
+            return JsonResponse(
+                {"error": "Upload a query image for two-image matching."}, status=400
+            )
+        try:
+            query_image = imaging.load_upload(query_image_id)
+        except (ValueError, FileNotFoundError) as exc:
+            return JsonResponse({"error": str(exc)}, status=404)
+        handler_params = dict(params)
+        handler_params["_query_image"] = query_image
+
     try:
-        result = operation.handler(image, params)
+        result = operation.handler(image, handler_params)
     except ValueError as exc:
         # Parameter-level problems are the user's to fix, so surface the text.
         return JsonResponse({"error": str(exc)}, status=400)
