@@ -439,6 +439,10 @@ def register_similarity(
     angle = ((angle + 180.0) % 360.0) - 180.0
     dlog = float(log_radii[1] - log_radii[0])
     scale = float(np.exp(radial_shift * dlog))
+    # Radial phase correlation is cyclic, so unrelated images can produce a
+    # wrapped shift corresponding to an absurd scale. Spectral Match is a
+    # similarity-registration tool, not an unlimited zoom estimator.
+    scale = float(np.clip(scale, 0.35, 3.0))
 
     # The real-image Fourier magnitude is centro-symmetric, so theta and
     # theta+180 degrees are indistinguishable at the first stage. Resolve that
