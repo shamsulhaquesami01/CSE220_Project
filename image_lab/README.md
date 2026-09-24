@@ -30,7 +30,7 @@ python3 manage.py runserver
 Open <http://127.0.0.1:8000/>. There is no database and no migration step.
 
 ```bash
-python manage.py test image_lab     # 23 tests
+python manage.py test image_lab
 python manage.py check
 ```
 
@@ -66,3 +66,56 @@ Browser regression coverage (requires Node.js, Playwright, and Chrome): start
 `node browser_tests/inspector.cjs`. Set `TEST_URL` to use another local server.
 The test uploads a generated PNG and checks all four operations, native export
 sizes, zoom/pan/fit, keyboard focus, close controls, mobile layout, and load errors.
+
+### Spectral Match (Fourier-Mellin registration)
+
+Spectral Match aligns two views of substantially the same planar image without
+OpenCV features or machine learning. It estimates a similarity transform:
+
+- in-plane rotation,
+- uniform scale,
+- horizontal translation,
+- vertical translation.
+
+The processing chain is:
+
+1. Optional 2-D Hann window.
+2. Centred 2-D FFT magnitude for the reference and query.
+3. Log-polar resampling of both Fourier magnitudes.
+4. Phase correlation in log-polar space to estimate rotation and scale.
+5. Explicit 180-degree ambiguity resolution using spatial registration quality.
+6. Undo estimated rotation/scale.
+7. A second phase-correlation pass to estimate translation.
+8. Optional parabolic subpixel peak refinement.
+9. Registered output, overlay, checkerboard comparison, and difference map.
+
+Two modes are available:
+
+- **Controlled transform challenge**: one upload is transformed by known
+  rotation, scale, and shifts. The estimator never receives those true values;
+  they are shown afterward so rotation/scale/translation errors can be measured.
+- **Match two uploaded images**: the first upload is the reference and a second
+  upload becomes the query. This works best when both show the same flat
+  scene/object and differ mainly by rotation, uniform zoom, and translation.
+
+The result grid exposes both FFT magnitudes, both log-polar images, the
+rotation/scale phase-correlation surface, the translation phase-correlation
+surface, registered query, overlay, checkerboard, and difference image. The
+registered image can be downloaded like any other panel.
+
+Useful metrics include the estimated transform, phase-correlation PSR and peak
+ratios, normalized aligned correlation, overlap fraction, overlap MSE, and
+controlled-mode ground-truth errors.
+
+Focused tests:
+
+    python manage.py test image_lab.test_spectral_match
+
+A good first controlled test is rotation +32 degrees, scale 0.78x, horizontal
+shift +10%, vertical shift -7%, Hann enabled, and subpixel refinement enabled.
+
+For real two-image tests, start with a screenshot, poster, document, map, book
+cover, PCB, or other mostly planar target. Create the query by rotating,
+uniformly resizing, shifting, or mildly cropping the same image. Strong
+perspective changes, unrelated images, deforming objects, or substantially
+different viewpoints are outside the similarity-transform model.
