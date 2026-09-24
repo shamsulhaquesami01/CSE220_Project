@@ -231,6 +231,83 @@
         transfer function is almost zero.
       </p>
     </section>
+
+
+    <!-- Fourier-Mellin image registration panel --------------------------->
+    <section class="card op-panel" data-op-panel="spectral_match" hidden>
+      <h2><span class="step">03</span> Spectral Match</h2>
+
+      <div class="field">
+        <label for="match-input-mode">Input mode</label>
+        <select id="match-input-mode">
+          <option value="controlled" selected>Controlled transform challenge</option>
+          <option value="real">Match two uploaded images</option>
+        </select>
+      </div>
+
+      <div data-match-real hidden>
+        <label class="dropzone" id="match-query-dropzone">
+          <input type="file" id="match-query-file" class="file-input"
+                 accept="image/png,image/jpeg,image/bmp,image/webp,image/tiff"
+                 aria-label="Upload the query image to match">
+          <span class="dropzone-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>
+            </svg>
+          </span>
+          <span class="dropzone-text">Add the query image.</span>
+          <span class="dropzone-browse">Drop it here or <u>browse files &nearr;</u></span>
+          <span class="dropzone-hint">Same scene / planar object, possibly rotated, scaled and shifted</span>
+        </label>
+        <p class="status" id="match-query-status">No query image loaded.</p>
+      </div>
+
+      <div data-match-controlled>
+        <div class="field">
+          <label for="match-rotation">True rotation <output id="match-rotation-out">+32&deg;</output></label>
+          <input type="range" id="match-rotation" min="-170" max="170" step="1" value="32">
+        </div>
+
+        <div class="field">
+          <label for="match-scale">True scale <output id="match-scale-out">0.78&times;</output></label>
+          <input type="range" id="match-scale" min="0.5" max="1.7" step="0.01" value="0.78">
+        </div>
+
+        <div class="field">
+          <label for="match-shift-x">Horizontal shift <output id="match-shift-x-out">+10%</output></label>
+          <input type="range" id="match-shift-x" min="-0.30" max="0.30" step="0.01" value="0.10">
+        </div>
+
+        <div class="field">
+          <label for="match-shift-y">Vertical shift <output id="match-shift-y-out">-7%</output></label>
+          <input type="range" id="match-shift-y" min="-0.30" max="0.30" step="0.01" value="-0.07">
+        </div>
+
+        <p class="fineprint">
+          The system creates a transformed query, then estimates rotation, scale and translation
+          from the pixels alone. Ground truth is revealed only in the measurements.
+        </p>
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="match-hann" checked>
+        <span>Apply 2-D Hann window before Fourier analysis</span>
+      </label>
+
+      <label class="checkline">
+        <input type="checkbox" id="match-subpixel" checked>
+        <span>Subpixel phase-correlation refinement</span>
+      </label>
+
+      <p class="fineprint" data-match-copy="controlled">
+        Watch the FFT magnitude become translation-invariant, then see log-polar coordinates
+        convert rotation and scale into shifts. The second phase-correlation stage recovers translation.
+      </p>
+      <p class="fineprint" data-match-copy="real" hidden>
+        The first upload is the reference; the second is the query. Best results come from the same
+        flat scene/object with in-plane rotation, uniform zoom and translation rather than strong perspective.
+      </p>
+    </section>
   </aside>
 
   <!-- ------------------------------------------------------------------ -->
@@ -265,5 +342,5 @@
 {% block scripts %}
 <script id="kernel-presets" type="application/json">{{ kernel_presets|safe }}</script>
 <script src="{% static 'image_lab/js/image-inspector.js' %}?v=inspector-1"></script>
-<script src="{% static 'image_lab/js/app.js' %}?v=deblur-upload-1"></script>
+<script src="{% static 'image_lab/js/app.js' %}?v=spectral-match-1"></script>
 {% endblock %}
