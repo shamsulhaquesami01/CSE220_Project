@@ -1,10 +1,4 @@
-"""
-Django settings for the Image Lab project.
-
-Deliberately minimal: this app has no models, no users and no admin, so the
-database, auth and contenttypes machinery are all switched off. That means
-there are no migrations to run -- `python manage.py runserver` just works.
-"""
+"""Django settings for Image Lab."""
 
 import os
 from pathlib import Path
@@ -12,10 +6,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# --- Secret key -------------------------------------------------------------
-# Read from the environment in production. For local coursework we persist a
-# generated key to a gitignored file so it survives autoreloads (a key that
-# changed on every reload would invalidate CSRF tokens mid-session).
+# Secret key: environment in production, local file during development.
 def _get_secret_key():
     env_key = os.environ.get("DJANGO_SECRET_KEY")
     if env_key:
@@ -34,12 +25,10 @@ def _get_secret_key():
 
 SECRET_KEY = _get_secret_key()
 
-# Keep the detailed Django debug page for local development, but default to
-# production-safe behaviour on Vercel unless DJANGO_DEBUG is explicitly set.
+# Debug locally, off by default on Vercel.
 DEBUG = os.environ.get("DJANGO_DEBUG", "0" if os.environ.get("VERCEL") else "1") == "1"
 
-# Django accepts a leading dot as "this domain and all subdomains", so this
-# covers the production hostname as well as Vercel preview deployment URLs.
+# Allow localhost and Vercel subdomains.
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
@@ -79,11 +68,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# No models anywhere in this project, so no database is configured.
+# No database is needed.
 DATABASES = {}
 
 
-# --- Static and media -------------------------------------------------------
+# Static and media
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
@@ -92,19 +81,17 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Uploaded originals and generated result panels are kept apart so the whole
-# results cache can be cleared without touching what the user uploaded.
+# Keep uploads and generated results separate.
 UPLOAD_SUBDIR = "uploads"
 RESULT_SUBDIR = "results"
 
 
-# --- Image Lab tuning -------------------------------------------------------
+# Image Lab limits
 
-# Longest edge an upload is downscaled to on ingest. Keeps the per-keystroke
-# convolution preview interactive; raise it if you need full-resolution output.
+# Limit image size so previews stay responsive.
 IMAGE_LAB_MAX_DIM = int(os.environ.get("IMAGE_LAB_MAX_DIM", 720))
 
-# Reject uploads larger than this before decoding them.
+# Upload size limit.
 IMAGE_LAB_MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = IMAGE_LAB_MAX_UPLOAD_BYTES
