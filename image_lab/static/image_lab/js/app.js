@@ -1,13 +1,4 @@
-/* Image Lab frontend.
- *
- * Plain ES2020, no framework and no bundler. The whole job is:
- *   1. upload an image and remember its id,
- *   2. collect the current operation's parameters,
- *   3. POST them, and swap in the returned panels.
- *
- * Every control funnels into `scheduleRun`, which debounces so dragging a
- * slider does not fire one request per pixel of travel.
- */
+/* Main frontend logic */
 'use strict';
 
 (function () {
