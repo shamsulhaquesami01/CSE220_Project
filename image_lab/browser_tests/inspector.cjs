@@ -1,4 +1,4 @@
-/* Run against manage.py runserver: NODE_PATH=<playwright location> node browser_tests/inspector.cjs */
+/* Image inspector browser test */
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 (async () => {
@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(process.env.TEST_URL || 'http://127.0.0.1:8765');
-    // Generate a real PNG without a checked-in binary fixture.
+    // Create a test PNG.
     const png = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 640; canvas.height = 480;
@@ -70,7 +70,7 @@ const assert = require('node:assert/strict');
     assert.equal(await viewport.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight), true);
     await dialog.getByRole('button', { name: '1:1 Actual pixels' }).click();
     assert.equal(await dialog.locator('output').textContent(), '100%');
-    // Native dialog traps keyboard focus, and X restores page scrolling.
+    // Check focus and close behavior.
     for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); assert.ok(await dialog.evaluate(el => el.contains(document.activeElement))); }
     await dialog.getByRole('button', { name: 'Close image inspector' }).click();
     assert.equal(await page.locator('body').evaluate(el => el.style.overflow), '');
@@ -87,7 +87,7 @@ const assert = require('node:assert/strict');
     await page.locator('.panel-inspect').first().click(); await loaded();
     await page.screenshot({ path: '/private/tmp/cse220-inspector-desktop.png' });
     await close();
-    // Failed exports leave close and download usable, with a visible error.
+    // Check image load failure handling.
     const source = await page.locator('.panel-download').first().getAttribute('href');
     await page.route(`**${source}`, route => route.abort());
     await page.locator('.panel-inspect').first().click();
