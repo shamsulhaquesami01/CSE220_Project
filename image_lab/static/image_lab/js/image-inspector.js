@@ -1,4 +1,4 @@
-/* Shared result inspector. The export is authoritative; previews may be rescaled. */
+/* Result image inspector */
 'use strict';
 window.createImageInspector = function () {
   const dialog = document.createElement('dialog');
@@ -105,7 +105,7 @@ window.createImageInspector = function () {
     if (opener?.isConnected) opener.focus({ preventScroll: true });
     else document.querySelector('.panel-inspect')?.focus({ preventScroll: true });
   }
-  // The native close event is queued; never let an old event clear a reopened image.
+  // Avoid clearing a reopened image.
   dialog.addEventListener('close', () => { if (!dialog.open) cleanup(); });
   viewport.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || !viewport.classList.contains('is-pannable')) return;
