@@ -1,8 +1,4 @@
-"""
-Correctness tests for the DSP core and result download behavior.
-
-Run with:  python manage.py test image_lab
-"""
+"""Core DSP tests."""
 
 import io
 import tempfile
@@ -17,7 +13,7 @@ from django.test import SimpleTestCase, override_settings
 from . import dsp_utils as dsp
 
 
-# Evaluate the 2D convolution sum directly from its definition, with zero padding.
+# Direct convolution reference.
 def naive_convolve2d(f, h):
     kh, kw = h.shape
     ay, ax = kh // 2, kw // 2
