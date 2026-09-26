@@ -1,16 +1,4 @@
-"""
-views.py
-
-Three endpoints:
-
-  GET  /              -- render the single-page GUI
-  POST /api/upload/   -- accept a multipart image, normalise it, return its id
-  POST /api/process/  -- run one registered operation, return panel URLs + metrics
-
-The processing endpoint is a JSON API rather than a form post so the frontend
-can re-run an operation on every slider drag and swap the images in place,
-which is what makes the kernel editor feel live.
-"""
+"""Django views for Image Lab."""
 
 from __future__ import annotations
 
@@ -29,7 +17,7 @@ from .operations import CLEAN_FILTERS, NOISE_MODELS, OPERATIONS, get_operation
 logger = logging.getLogger(__name__)
 
 
-# Render the single-page interface.
+# Main page.
 @require_GET
 def index(request):
     context = {
@@ -45,7 +33,7 @@ def index(request):
     return render(request, "image_lab/index.html", context)
 
 
-# Accept an uploaded image, normalise it, and return a handle to it.
+# Upload an image.
 @require_POST
 def upload(request):
     uploaded = request.FILES.get("image")
@@ -66,12 +54,12 @@ def upload(request):
         logger.exception("Upload failed")
         return JsonResponse({"error": "Could not decode that image."}, status=400)
 
-    # Opportunistic housekeeping so the results cache cannot grow without bound.
+    # Trim old local results.
     imaging.prune_results()
     return JsonResponse(info)
 
 
-# Run one registered operation against a stored image and return the results.
+# Run the selected experiment.
 @require_POST
 def process(request):
     try:
@@ -112,7 +100,7 @@ def process(request):
     try:
         result = operation.handler(image, handler_params)
     except ValueError as exc:
-        # Parameter-level problems are the user's to fix, so surface the text.
+        # Return parameter errors to the UI.
         return JsonResponse({"error": str(exc)}, status=400)
     except MemoryError:
         return JsonResponse(
