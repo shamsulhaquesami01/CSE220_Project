@@ -39,8 +39,7 @@ class MotionRestorationTests(SimpleTestCase):
         np.testing.assert_allclose(wiener, image, atol=1e-8)
 
     def test_wiener_is_stable_with_motion_blur_and_noise(self):
-        # Structured synthetic image: enough edges and smooth regions to make
-        # restoration quality meaningful without depending on an external file.
+        # Synthetic image with edges and smooth areas.
         y, x = np.mgrid[:64, :64]
         image = ((x // 8 + y // 8) % 2).astype(np.float64)
         image = 0.15 + 0.7 * image
@@ -59,8 +58,7 @@ class MotionRestorationTests(SimpleTestCase):
         self.assertTrue(np.isfinite(wiener).all())
         self.assertLessEqual(wiener.min(), 1.0)
         self.assertGreaterEqual(wiener.max(), 0.0)
-        # Wiener should recover useful information rather than simply return
-        # the corrupted observation.
+        # Wiener output should improve the degraded image.
         self.assertGreater(dsp.psnr(image, wiener), dsp.psnr(image, degraded))
 
     def test_uploaded_observation_is_not_blurred_again(self):
