@@ -1,14 +1,4 @@
-"""Frequency-domain image restoration experiments for Image Lab.
-
-This module registers the motion-deblurring experiment separately from the
-basic spatial operations.  The model is
-
-    G(u,v) = H(u,v) F(u,v) + N(u,v)
-
-where H is the Fourier transform of a motion-blur point-spread function.  We
-show both direct inverse filtering and a regularised Wiener restoration so the
-failure of 1/H near spectral zeros is visible rather than hidden.
-"""
+"""Frequency-domain motion deblurring experiment."""
 
 from __future__ import annotations
 
@@ -71,9 +61,7 @@ def op_deblur(image: np.ndarray, params: dict) -> OpResult:
         )
     elapsed_ms = (time.perf_counter() - started) * 1000.0
 
-    # Visualise the transfer function itself.  A motion PSF creates dark bands
-    # / near-zeros in H; those are exactly the frequencies where G/H becomes
-    # ill-conditioned and noise explodes.
+    # Show the blur transfer function.
     spectrum = dsp.transfer_magnitude_image(psf, image.shape[:2])
     spectrum_rgb = np.repeat(spectrum[..., None], 3, axis=2)
 
