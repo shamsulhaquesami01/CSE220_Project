@@ -1,18 +1,4 @@
-"""
-operations.py
-
-The pluggable operation registry.
-
-Every DSP experiment the GUI can run is a function registered here with
-`@register`. Each one receives the source image plus a validated parameter dict
-and returns an `OpResult`: a list of image panels to display, a list of numeric
-measurements, and any notes to print under the panels.
-
-Adding a new experiment means writing one function in this file and nothing
-else -- the view, the URL, the panel grid and the metrics table are all
-driven off this registry. That is what makes the noise-cleaner module (and
-anything you add after it) a drop-in rather than a rewrite.
-"""
+"""DSP operation registry and experiment handlers."""
 
 from __future__ import annotations
 
@@ -25,9 +11,7 @@ import numpy as np
 from . import dsp_utils as dsp
 
 
-# ---------------------------------------------------------------------------
 # Result containers
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -68,7 +52,7 @@ class Operation:
 OPERATIONS: dict[str, Operation] = {}
 
 
-# Register a handler function under an operation id.
+# Register an operation.
 def register(op_id: str, label: str, description: str):
     def decorator(func):
         OPERATIONS[op_id] = Operation(op_id, label, description, func)
@@ -77,12 +61,7 @@ def register(op_id: str, label: str, description: str):
     return decorator
 
 
-# ---------------------------------------------------------------------------
-# Parameter coercion helpers
-#
-# Values arrive as JSON from the browser, so nothing can be trusted to be the
-# right type or within a sane range. Each helper clamps as well as casts.
-# ---------------------------------------------------------------------------
+# Parse and clamp request parameters.
 
 
 def _as_float(params, key, default, low=None, high=None):
@@ -115,7 +94,7 @@ def _as_choice(params, key, choices, default):
     return value if value in choices else default
 
 
-# Parse the kernel matrix coming from the editor grid into a float array.
+# Parse the kernel grid.
 def _as_kernel(params, key="kernel"):
     raw = params.get(key)
     if not isinstance(raw, list) or not raw:
@@ -152,9 +131,7 @@ def _fmt(value, digits=4):
     return f"{value:.{digits}f}"
 
 
-# ---------------------------------------------------------------------------
-# Operation 1 -- 2D convolution (blur / sharpen / edge detection)
-# ---------------------------------------------------------------------------
+# 2D convolution
 
 
 @register(
@@ -175,8 +152,7 @@ def op_convolve(image: np.ndarray, params: dict) -> OpResult:
     filtered_raw = dsp.convolve2d(image, kernel, pad_mode)
     elapsed_ms = (time.perf_counter() - started) * 1000.0
 
-    # Keep the unclipped result for the statistics: knowing the response ran to
-    # -0.8 or +1.9 explains the clipping artefacts far better than the picture.
+    # Keep raw values for range and clipping stats.
     out_min = float(filtered_raw.min())
     out_max = float(filtered_raw.max())
     filtered = np.clip(filtered_raw, 0.0, 1.0)
@@ -232,9 +208,7 @@ def op_convolve(image: np.ndarray, params: dict) -> OpResult:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Operation 2 -- resampling with and without an anti-aliasing prefilter
-# ---------------------------------------------------------------------------
+# Resampling with anti-aliasing
 
 
 @register(
@@ -260,10 +234,7 @@ def op_resample(image: np.ndarray, params: dict) -> OpResult:
     sigma_y = dsp.antialias_sigma(in_h, out_h)
     sigma_x = dsp.antialias_sigma(in_w, out_w)
 
-    # Magnify both results back to the original footprint with nearest
-    # neighbour. Nearest adds no smoothing of its own, so what you see is
-    # exactly the samples that were kept -- a fair side-by-side at a size where
-    # moire is actually visible.
+    # Upscale previews with nearest-neighbor for a fair comparison.
     view_no_aa = dsp.resize_nearest(without_aa, in_h, in_w)
     view_aa = dsp.resize_nearest(with_aa, in_h, in_w)
 
@@ -339,9 +310,7 @@ def op_resample(image: np.ndarray, params: dict) -> OpResult:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Operation 3 -- noise injection and cleaning
-# ---------------------------------------------------------------------------
+# Noise and restoration
 
 NOISE_MODELS = {
     "none": "No noise",
@@ -371,11 +340,10 @@ def op_noise(image: np.ndarray, params: dict) -> OpResult:
     noise_amount = _as_float(params, "noise_amount", 0.06, 0.0, 1.0)
     filter_size = _as_int(params, "filter_size", 3, 1, 15)
     filter_sigma = _as_float(params, "filter_sigma", 1.0, 0.1, 10.0)
-    # A fixed seed keeps the noise stable while you tune the filter, so any
-    # change you see is the filter's doing and not a fresh random draw.
+    # Keep the same noise while tuning filters.
     seed = _as_int(params, "seed", 0, 0, 10_000_000)
 
-    # Force odd window sizes: an even window has no centre sample to replace.
+    # Use an odd filter window.
     if filter_size % 2 == 0:
         filter_size += 1
 
@@ -452,6 +420,6 @@ def op_noise(image: np.ndarray, params: dict) -> OpResult:
     return result
 
 
-# Return the registered operation, raising KeyError if the id is unknown.
+# Look up an operation.
 def get_operation(op_id: str) -> Operation:
     return OPERATIONS[op_id]
