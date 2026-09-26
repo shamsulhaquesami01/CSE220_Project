@@ -356,18 +356,11 @@ def difference_map(a, b, gain=1.0):
     return np.clip(diff * float(gain), 0.0, 1.0)
 
 
-# ---------------------------------------------------------------------------
-# Frequency-domain motion blur and restoration
-# ---------------------------------------------------------------------------
+# Frequency-domain restoration
 
 
 def motion_psf(length=17, angle=0.0):
-    """Return a normalised motion-blur point-spread function.
-
-    The ideal line is sampled densely and splatted bilinearly onto the pixel
-    grid.  That keeps diagonal kernels smooth instead of producing a jagged
-    nearest-pixel staircase.
-    """
+    """Build a normalized motion-blur PSF."""
     length = max(1.0, float(length))
     if length <= 1.0:
         return np.array([[1.0]], dtype=np.float64)
@@ -453,16 +446,13 @@ def _frequency_restore_plane(
     g = np.fft.fft2(degraded_pad)
     abs_h = np.abs(h)
 
-    # Direct inverse filtering: Fhat = G/H.  We only suppress bins where H is
-    # essentially zero to avoid literal infinities; near-zeros are deliberately
-    # left in so the classic noise-amplification failure remains visible.
+    # Direct inverse filter. Ignore only near-zero H values.
     inverse_spectrum = np.zeros_like(g)
     stable = abs_h >= inverse_floor
     inverse_spectrum[stable] = g[stable] / h[stable]
     inverse_pad = np.real(np.fft.ifft2(inverse_spectrum))
 
-    # Wiener/Tikhonov form: conjugate(H)/( |H|^2 + K ).  K trades perfect
-    # inversion for stability in bins the blur has almost erased.
+    # Wiener filter adds regularization for stability.
     wiener_spectrum = g * np.conj(h) / (abs_h ** 2 + wiener_k)
     wiener_pad = np.real(np.fft.ifft2(wiener_spectrum))
 
@@ -546,11 +536,7 @@ def motion_deblur_experiment(
     inverse_floor=1e-3,
     seed=0,
 ):
-    """Blur an image with a known PSF, add noise, then restore it two ways.
-
-    Returns (blurred, degraded, inverse, wiener, psf).  Reflect padding is used
-    before the FFT so circular wrap-around is pushed outside the visible crop.
-    """
+    """Simulate motion blur and restore it with inverse and Wiener filters."""
     image = np.asarray(image, dtype=np.float64)
     psf = motion_psf(length, angle)
     rng = np.random.default_rng(seed)
