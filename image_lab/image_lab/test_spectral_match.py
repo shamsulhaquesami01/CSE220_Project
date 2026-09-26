@@ -38,7 +38,7 @@ class SpectralMatchCoreTests(SimpleTestCase):
         query = sm.warp_similarity(reference, tx=7.4, ty=-5.7)
         result = sm.phase_correlation(reference, query, subpixel=True)
 
-        # phase_correlation returns the shift that must be applied to query.
+        # Returned shift aligns the query to the reference.
         self.assertAlmostEqual(result["shift_x"], -7.4, delta=0.6)
         self.assertAlmostEqual(result["shift_y"], 5.7, delta=0.6)
         self.assertGreater(result["psr"], 8.0)
