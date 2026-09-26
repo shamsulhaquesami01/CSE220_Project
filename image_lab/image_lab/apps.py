@@ -7,7 +7,6 @@ class ImageLabConfig(AppConfig):
     verbose_name = "Image Lab"
 
     def ready(self):
-        # Import advanced experiment modules for their @register side effects.
-        # Keeping them separate prevents operations.py from becoming a monolith.
+        # Load extra operations into the registry.
         from . import restoration  # noqa: F401
         from . import spectral_match  # noqa: F401
