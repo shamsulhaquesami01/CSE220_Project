@@ -1,10 +1,4 @@
-"""Rotation/scale/translation invariant image registration using Fourier-Mellin ideas.
-
-The matcher is deliberately classical DSP: no OpenCV feature detector and no ML.
-Translation is removed by using Fourier magnitude, rotation/scale become shifts in
-log-polar coordinates, and phase correlation estimates those shifts.  After
-rotation/scale correction a second phase-correlation stage estimates translation.
-"""
+"""Fourier-Mellin image registration helpers."""
 
 from __future__ import annotations
 
@@ -93,11 +87,7 @@ def warp_similarity(
     ty: float = 0.0,
     out_shape: tuple[int, int] | None = None,
 ) -> np.ndarray:
-    """Apply a centre-based similarity transform by inverse-mapped bilinear sampling.
-
-    Forward geometry is:
-        p_out = scale * R(angle) * (p_in - centre_in) + centre_out + [tx, ty]
-    """
+    """Apply rotation, scale, and translation around the image center."""
     image = np.asarray(image, dtype=np.float64)
     h, w = image.shape[:2]
     if scale <= 0:
@@ -439,15 +429,10 @@ def register_similarity(
     angle = ((angle + 180.0) % 360.0) - 180.0
     dlog = float(log_radii[1] - log_radii[0])
     scale = float(np.exp(radial_shift * dlog))
-    # Radial phase correlation is cyclic, so unrelated images can produce a
-    # wrapped shift corresponding to an absurd scale. Spectral Match is a
-    # similarity-registration tool, not an unlimited zoom estimator.
+    # Clamp wrapped scale estimates to a useful range.
     scale = float(np.clip(scale, 0.35, 3.0))
 
-    # The real-image Fourier magnitude is centro-symmetric, so theta and
-    # theta+180 degrees are indistinguishable at the first stage. Resolve that
-    # ambiguity by trying both candidates and keeping the spatial registration
-    # with the stronger normalized correlation (PSR breaks close ties).
+    # Test both 180-degree candidates and keep the better match.
     candidate_angles = [
         angle,
         ((angle + 180.0 + 180.0) % 360.0) - 180.0,
