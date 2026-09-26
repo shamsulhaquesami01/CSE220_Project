@@ -6,9 +6,7 @@
 
 <div class="layout">
 
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Control column                                                      -->
-  <!-- ------------------------------------------------------------------ -->
+  <!-- Controls -->
   <aside class="controls">
 
     <section class="card">
@@ -47,7 +45,7 @@
       {% endfor %}
     </section>
 
-    <!-- Convolution panel ------------------------------------------------->
+    <!-- Convolution -->
     <section class="card op-panel" data-op-panel="convolve" hidden>
       <h2><span class="step">03</span> Shape your kernel</h2>
 
@@ -94,7 +92,7 @@
       </div>
     </section>
 
-    <!-- Resample panel ---------------------------------------------------->
+    <!-- Resampling -->
     <section class="card op-panel" data-op-panel="resample" hidden>
       <h2><span class="step">03</span> Find your scale</h2>
 
@@ -124,7 +122,7 @@
       </p>
     </section>
 
-    <!-- Noise panel ------------------------------------------------------->
+    <!-- Noise -->
     <section class="card op-panel" data-op-panel="noise" hidden>
       <h2><span class="step">03</span> Noise &amp; cleaning</h2>
 
@@ -179,7 +177,7 @@
       </div>
     </section>
 
-    <!-- Frequency-domain restoration panel ------------------------------->
+    <!-- FFT deblur -->
     <section class="card op-panel" data-op-panel="deblur" hidden>
       <h2><span class="step">03</span> Rebuild what motion erased</h2>
 
@@ -233,7 +231,7 @@
     </section>
 
 
-    <!-- Fourier-Mellin image registration panel --------------------------->
+    <!-- Spectral matching -->
     <section class="card op-panel" data-op-panel="spectral_match" hidden>
       <h2><span class="step">03</span> Spectral Match</h2>
 
@@ -310,9 +308,7 @@
     </section>
   </aside>
 
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Results column                                                      -->
-  <!-- ------------------------------------------------------------------ -->
+  <!-- Results -->
   <section class="results">
     <div class="workspace-heading"><h2>The canvas</h2><span><i aria-hidden="true"></i> LIVE PREVIEW</span></div>
     <div class="empty-state" id="empty-state">
