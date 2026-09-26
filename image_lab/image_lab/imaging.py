@@ -1,14 +1,4 @@
-"""
-imaging.py
-
-Image/file I/O for Image Lab.
-
-Local development uses MEDIA_ROOT. On Vercel, when a Blob store is connected,
-uploads and generated result PNGs are stored in Vercel Blob so they survive
-across serverless requests and remain downloadable.
-
-The DSP core remains pure NumPy and is intentionally unaware of storage.
-"""
+"""Image loading and storage helpers."""
 
 from __future__ import annotations
 
@@ -37,12 +27,7 @@ _BLOB_ID_PREFIX = "blob_"
 
 
 def _blob_auth() -> tuple[str | None, str | None]:
-    """Return (bearer_token, bare_store_id) for Vercel Blob.
-
-    Vercel's Python SDK resolves the rotating OIDC token from the current
-    request context. A static Blob read/write token remains supported as a
-    compatibility fallback.
-    """
+    """Get Blob credentials."""
     oidc = os.environ.get("VERCEL_OIDC_TOKEN")
     if not oidc and os.environ.get("VERCEL"):
         try:
@@ -86,9 +71,7 @@ def _ensure_storage_ready() -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Local filesystem backend
-# ---------------------------------------------------------------------------
+# Local storage
 
 
 def upload_dir() -> Path:
@@ -107,9 +90,7 @@ def media_url(relative_path: str) -> str:
     return f"{settings.MEDIA_URL}{relative_path}".replace("\\", "/")
 
 
-# ---------------------------------------------------------------------------
-# Shared image encode/decode helpers
-# ---------------------------------------------------------------------------
+# Image encode/decode helpers
 
 
 def _fit_within(image: np.ndarray, max_dim: int) -> np.ndarray:
@@ -139,9 +120,7 @@ def _decode_image_bytes(payload: bytes) -> np.ndarray:
     return dsp.to_float(array)
 
 
-# ---------------------------------------------------------------------------
-# Vercel Blob backend
-# ---------------------------------------------------------------------------
+# Blob storage
 
 
 def _blob_put(pathname: str, payload: bytes, content_type: str = "image/png") -> str:
@@ -232,9 +211,7 @@ def _decode_blob_id(image_id: str) -> str:
     return url
 
 
-# ---------------------------------------------------------------------------
-# Public API used by views.py
-# ---------------------------------------------------------------------------
+# Public storage helpers
 
 
 def store_upload(uploaded_file, grayscale: bool = False) -> dict:
