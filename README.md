@@ -61,9 +61,9 @@ Every result image can also be opened in the **Image Inspector** at its actual e
 
 An editable kernel is slid across the image using the 2D convolution sum. The lab supports **zero, reflect, edge, and wrap** boundary extensions and reports the kernel sum (DC gain), raw output range, clipping, MSE, PSNR, and compute time.
 
-[
-g[m,n] = sum_k sum_l f[k,l],h[m-k,n-l]
-]
+$
+g[m,n] = \\sum_k \\sum_l f[k,l]\\,h[m-k,n-l]
+$
 
 The experiment makes it easy to compare smoothing kernels, sharpening kernels, and zero-sum edge detectors instead of treating them as unrelated image effects.
 
@@ -90,23 +90,23 @@ This also exposes an important distinction: mean/Gaussian smoothing is linear fi
 
 Motion blur is modeled as convolution with a point-spread function (PSF):
 
-[
+$
 g = f * h + n
-]
+$
 
 The 2D DFT turns convolution into multiplication:
 
-[
+$
 G(u,v) = H(u,v)F(u,v) + N(u,v)
-]
+$
 
 Image Lab compares **direct inverse filtering** with a regularized **Wiener/Tikhonov-style restoration**:
 
-[
-hat F(u,v)=rac{G(u,v)H^*(u,v)}{|H(u,v)|^2+K}
-]
+$$
+\\hat F(u,v)=\\frac{G(u,v)H^*(u,v)}{|H(u,v)|^2+K}
+$$
 
-The direct inverse demonstrates why dividing by very small values of (H) amplifies noise. The Wiener result trades perfect inversion for stability. The interface also visualizes the centered log-magnitude of the blur transfer function (|H(u,v)|).
+The direct inverse demonstrates why dividing by very small values of $H$ amplifies noise. The Wiener result trades perfect inversion for stability. The interface also visualizes the centered log-magnitude of the blur transfer function $|H(u,v)|$.
 
 Two modes are provided:
 
