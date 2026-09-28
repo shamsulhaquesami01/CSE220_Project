@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Image Lab</title>
+  <desc id="desc">2D DSP Experimentation Platform for CSE220 Signals and Linear Systems</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1511"/>
+      <stop offset="1" stop-color="#18231c"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8fbf4d"/>
+      <stop offset="1" stop-color="#d7ff8a"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#bg)"/>
+  <g opacity=".12" stroke="#b8d48b" stroke-width="1">
+    <path d="M0 72H1200M0 144H1200M0 216H1200M0 288H1200"/>
+    <path d="M120 0V360M240 0V360M360 0V360M480 0V360M600 0V360M720 0V360M840 0V360M960 0V360M1080 0V360"/>
+  </g>
+  <path d="M44 248 C88 248 93 188 126 188 S168 285 207 285 S246 126 286 126 S326 242 365 242 S405 202 444 202"
+        fill="none" stroke="url(#line)" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+  <g transform="translate(474 74)">
+    <text x="0" y="78" fill="#f3f7ed" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="5">IMAGE LAB</text>
+    <text x="3" y="122" fill="#a8bd98" font-family="Arial, Helvetica, sans-serif" font-size="23" letter-spacing="3">2D DSP · WITHOUT THE BLACK BOX</text>
+    <line x1="3" y1="150" x2="624" y2="150" stroke="#506252" stroke-width="2"/>
+    <g font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">
+      <rect x="3" y="176" width="112" height="36" rx="18" fill="#243329" stroke="#7fa44e"/>
+      <text x="59" y="199" fill="#d7ff8a" text-anchor="middle">CONVOLVE</text>
+      <rect x="127" y="176" width="100" height="36" rx="18" fill="#243329" stroke="#7fa44e"/>
+      <text x="177" y="199" fill="#d7ff8a" text-anchor="middle">SAMPLE</text>
+      <rect x="239" y="176" width="92" height="36" rx="18" fill="#243329" stroke="#7fa44e"/>
+      <text x="285" y="199" fill="#d7ff8a" text-anchor="middle">DENOISE</text>
+      <rect x="343" y="176" width="80" height="36" rx="18" fill="#243329" stroke="#7fa44e"/>
+      <text x="383" y="199" fill="#d7ff8a" text-anchor="middle">FFT</text>
+      <rect x="435" y="176" width="116" height="36" rx="18" fill="#243329" stroke="#7fa44e"/>
+      <text x="493" y="199" fill="#d7ff8a" text-anchor="middle">REGISTER</text>
+    </g>
+    <text x="3" y="260" fill="#708274" font-family="Arial, Helvetica, sans-serif" font-size="15" letter-spacing="2">CSE220 · SIGNALS &amp; LINEAR SYSTEMS</text>
+  </g>
+  <circle cx="1125" cy="56" r="8" fill="#b7e66b"/>
+  <circle cx="1153" cy="56" r="8" fill="#536858"/>
+</svg>
